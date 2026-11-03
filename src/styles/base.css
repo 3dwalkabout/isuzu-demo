@@ -43,6 +43,30 @@ body {
   pointer-events: none;
 }
 
+.viewer-status--message {
+  align-content: center;
+  justify-items: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.viewer-status--message p {
+  max-width: 36ch;
+  margin: 0;
+}
+
+.retry {
+  padding: 8px 14px;
+  border: 1px solid #58d1e0;
+  border-radius: 4px;
+  background: transparent;
+  color: #58d1e0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .reset-view {
   position: absolute;
   right: 16px;

@@ -15,6 +15,8 @@ import {
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
+  type Material,
+  type Object3D,
   type Texture,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -25,6 +27,7 @@ import { applyVehicleMaterials, type VehicleMaterials } from "./materials";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/dmax.glb`;
 const HDRI_URL = `${import.meta.env.BASE_URL}hdri/studio.hdr`;
+const withBust = (url: string, bust?: string) => (bust ? `${url}?r=${encodeURIComponent(bust)}` : url);
 const MAX_PIXEL_RATIO = 2;
 const BACKGROUND = "#16181b";
 
@@ -42,9 +45,31 @@ export interface Viewer {
 }
 
 export interface ViewerOptions {
+  /** Appended to asset URLs so a retry bypasses a cached failed response. */
+  cacheBust?: string;
   onProgress?: (fraction: number) => void;
   onLoaded?: () => void;
   onError?: (error: unknown) => void;
+  onContextLost?: () => void;
+  onContextRestored?: () => void;
+}
+
+const TEXTURE_SLOTS = ["map", "normalMap", "roughnessMap", "metalnessMap", "emissiveMap", "aoMap"] as const;
+
+/** Releases the geometries, materials and textures under an object. */
+function disposeObject(root: Object3D) {
+  root.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) return;
+    mesh.geometry.dispose();
+    const materials: Material[] = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      for (const slot of TEXTURE_SLOTS) {
+        (material as unknown as Record<string, Texture | null | undefined>)[slot]?.dispose();
+      }
+      material.dispose();
+    }
+  });
 }
 
 function radialTexture(stops: [number, string][]): CanvasTexture {
@@ -79,7 +104,7 @@ function groundPlane(texture: CanvasTexture, width: number, depth: number, y: nu
 
 export function createViewer(
   container: HTMLElement,
-  { onProgress, onLoaded, onError }: ViewerOptions = {},
+  { cacheBust, onProgress, onLoaded, onError, onContextLost, onContextRestored }: ViewerOptions = {},
 ): Viewer {
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
@@ -109,6 +134,21 @@ export function createViewer(
   };
   controls.addEventListener("change", requestRender);
 
+  const canvas = renderer.domElement;
+  const handleContextLost = (event: Event) => {
+    // keep the context restorable and stop drawing until it returns
+    event.preventDefault();
+    cancelAnimationFrame(frame);
+    frame = 0;
+    onContextLost?.();
+  };
+  const handleContextRestored = () => {
+    onContextRestored?.();
+    requestRender();
+  };
+  canvas.addEventListener("webglcontextlost", handleContextLost);
+  canvas.addEventListener("webglcontextrestored", handleContextRestored);
+
   const resize = () => {
     const { clientWidth: width, clientHeight: height } = container;
     if (!width || !height) return;
@@ -122,6 +162,12 @@ export function createViewer(
   resize();
 
   let disposed = false;
+  let model: Object3D | null = null;
+  let pending = 2;
+  const assetLoaded = () => {
+    pending -= 1;
+    if (pending === 0 && !disposed) onLoaded?.();
+  };
   let environment: Texture | null = null;
   const disposables: { dispose: () => void }[] = [];
   const startTarget = new Vector3();
@@ -149,26 +195,35 @@ export function createViewer(
     requestRender();
   };
 
-  new HDRLoader().load(HDRI_URL, (texture) => {
-    if (disposed) {
+  new HDRLoader().load(
+    withBust(HDRI_URL, cacheBust),
+    (texture) => {
+      if (disposed) {
+        texture.dispose();
+        return;
+      }
+      texture.mapping = EquirectangularReflectionMapping;
+      const target = pmrem.fromEquirectangular(texture);
       texture.dispose();
-      return;
-    }
-    texture.mapping = EquirectangularReflectionMapping;
-    const target = pmrem.fromEquirectangular(texture);
-    texture.dispose();
-    environment = target.texture;
-    scene.environment = environment;
-    disposables.push(target);
-    requestRender();
-  });
+      environment = target.texture;
+      scene.environment = environment;
+      disposables.push(target);
+      requestRender();
+      assetLoaded();
+    },
+    undefined,
+    (error) => {
+      if (!disposed) onError?.(error);
+    },
+  );
 
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
   loader.load(
-    MODEL_URL,
+    withBust(MODEL_URL, cacheBust),
     (gltf) => {
       if (disposed) return;
+      model = gltf.scene;
       vehicleMaterials = applyVehicleMaterials(gltf.scene, paintColour);
       scene.add(gltf.scene);
 
@@ -202,8 +257,8 @@ export function createViewer(
       camera.updateProjectionMatrix();
       resetView();
 
-      onLoaded?.();
       requestRender();
+      assetLoaded();
     },
     (event) => {
       if (event.lengthComputable) onProgress?.(event.loaded / event.total);
@@ -224,6 +279,9 @@ export function createViewer(
       disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      canvas.removeEventListener("webglcontextlost", handleContextLost);
+      canvas.removeEventListener("webglcontextrestored", handleContextRestored);
+      if (model) disposeObject(model);
       controls.dispose();
       for (const item of disposables) item.dispose();
       vehicleMaterials?.dispose();
