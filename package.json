@@ -8,6 +8,7 @@
     "build": "tsc --noEmit --incremental false && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit --incremental false",
+    "test": "node --test src/config/*.test.ts",
     "optimise-model": "node scripts/optimise-model.mjs"
   },
   "engines": {

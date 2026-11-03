@@ -79,3 +79,25 @@ body {
   font: inherit;
   cursor: pointer;
 }
+
+.swatches {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 10px;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  outline: 1px solid #5a5e63;
+  cursor: pointer;
+}
+
+.swatch[aria-pressed="true"] {
+  border-color: #16181b;
+  outline: 2px solid #58d1e0;
+}

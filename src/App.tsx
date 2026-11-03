@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { PAINT_COLOURS } from "@/config/colours";
+import { configurationReducer, initialConfiguration } from "@/state/configuration";
 import { createViewer, type Viewer } from "@/viewer/createViewer";
 
 type Status = "loading" | "ready" | "failed" | "unsupported" | "lost";
@@ -15,6 +17,8 @@ export function App() {
   const [status, setStatus] = useState<Status>("loading");
   const [progress, setProgress] = useState(0);
   const [attempt, setAttempt] = useState(0);
+  const [configuration, dispatch] = useReducer(configurationReducer, undefined, initialConfiguration);
+  const paintHex = PAINT_COLOURS.find((c) => c.id === configuration.colourId)?.hex;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -36,11 +40,17 @@ export function App() {
       return;
     }
     viewerRef.current = viewer;
+    if (paintHex) viewer.setPaintColour(paintHex);
     return () => {
       viewer.dispose();
       viewerRef.current = null;
     };
+    // paintHex is applied by the effect below, a retry recreates the viewer with the current colour.
   }, [attempt]);
+
+  useEffect(() => {
+    if (paintHex) viewerRef.current?.setPaintColour(paintHex);
+  }, [paintHex]);
 
   return (
     <main className="app">
@@ -54,6 +64,22 @@ export function App() {
         <button type="button" className="reset-view" onClick={() => viewerRef.current?.resetView()}>
           Reset view
         </button>
+      )}
+      {status === "ready" && (
+        <div className="swatches" role="group" aria-label="Body colour">
+          {PAINT_COLOURS.map((colour) => (
+            <button
+              key={colour.id}
+              type="button"
+              className="swatch"
+              style={{ backgroundColor: colour.hex }}
+              aria-label={colour.name}
+              aria-pressed={colour.id === configuration.colourId}
+              title={colour.name}
+              onClick={() => dispatch({ type: "selectColour", colourId: colour.id })}
+            />
+          ))}
+        </div>
       )}
       {status !== "loading" && status !== "ready" && (
         <div className="viewer-status viewer-status--message" role="alert">

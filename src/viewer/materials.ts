@@ -10,7 +10,7 @@ import { Color, Mesh, MeshPhysicalMaterial, type Material, type Object3D } from 
 export type GlassMode = "alpha" | "transmission";
 export const GLASS_MODE: GlassMode = "alpha";
 
-export const DEFAULT_PAINT_COLOUR = "#9b1c22";
+export const DEFAULT_PAINT_COLOUR = "#91111a";
 
 const PAINT = {
   material: "carpaint",
