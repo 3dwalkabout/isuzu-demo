@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# source model files, only the optimised output is committed
+source-models/
+*.fbx
+*.blend
+*.blend1

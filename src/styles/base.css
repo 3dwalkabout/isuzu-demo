@@ -1,0 +1,81 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #16181b;
+  color: #d5d5d3;
+  font-family: system-ui, sans-serif;
+}
+
+.app {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.viewer {
+  position: absolute;
+  inset: 0;
+}
+
+.viewer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  pointer-events: none;
+}
+
+.viewer-status--message {
+  align-content: center;
+  justify-items: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.viewer-status--message p {
+  max-width: 36ch;
+  margin: 0;
+}
+
+.retry {
+  padding: 8px 14px;
+  border: 1px solid #58d1e0;
+  border-radius: 4px;
+  background: transparent;
+  color: #58d1e0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.reset-view {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  padding: 8px 14px;
+  border: 1px solid #58d1e0;
+  border-radius: 4px;
+  background: transparent;
+  color: #58d1e0;
+  font: inherit;
+  cursor: pointer;
+}

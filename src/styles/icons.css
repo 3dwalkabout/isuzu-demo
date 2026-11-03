@@ -1,0 +1,35 @@
+:root {
+  --color-icon: #d5d5d3;
+  --color-icon-active: #58d1e0;
+  --icon-size: 48px;
+}
+
+.icon {
+  display: block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
+
+.icon-control {
+  position: relative;
+  display: inline-flex;
+  padding: 0 0 8px;
+  border: 0;
+  background: none;
+  color: var(--color-icon);
+  cursor: pointer;
+}
+
+.icon-control[aria-pressed="true"] {
+  color: var(--color-icon-active);
+}
+
+.icon-control[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: currentColor;
+}
