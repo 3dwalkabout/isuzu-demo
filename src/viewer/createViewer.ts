@@ -21,6 +21,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { applyVehicleMaterials, type VehicleMaterials } from "./materials";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/dmax.glb`;
 const HDRI_URL = `${import.meta.env.BASE_URL}hdri/studio.hdr`;
@@ -36,6 +37,7 @@ const MAX_POLAR_ANGLE = MathUtils.degToRad(87);
 
 export interface Viewer {
   resetView: () => void;
+  setPaintColour: (colour: string) => void;
   dispose: () => void;
 }
 
@@ -124,6 +126,8 @@ export function createViewer(
   const disposables: { dispose: () => void }[] = [];
   const startTarget = new Vector3();
   let fitWidth = 5.6;
+  let vehicleMaterials: VehicleMaterials | null = null;
+  let paintColour: string | undefined;
 
   // Distance at which the vehicle length fits the horizontal field of view.
   const fitDistance = () => {
@@ -165,6 +169,7 @@ export function createViewer(
     MODEL_URL,
     (gltf) => {
       if (disposed) return;
+      vehicleMaterials = applyVehicleMaterials(gltf.scene, paintColour);
       scene.add(gltf.scene);
 
       const box = new Box3().setFromObject(gltf.scene);
@@ -210,12 +215,18 @@ export function createViewer(
 
   return {
     resetView,
+    setPaintColour(colour) {
+      paintColour = colour;
+      vehicleMaterials?.setPaintColour(colour);
+      requestRender();
+    },
     dispose() {
       disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
       controls.dispose();
       for (const item of disposables) item.dispose();
+      vehicleMaterials?.dispose();
       environment?.dispose();
       pmrem.dispose();
       renderer.dispose();
