@@ -10,8 +10,6 @@ import { Color, Mesh, MeshPhysicalMaterial, type Material, type Object3D } from 
 export type GlassMode = "alpha" | "transmission";
 export const GLASS_MODE: GlassMode = "alpha";
 
-export const DEFAULT_PAINT_COLOUR = "#9b1c22";
-
 const PAINT = {
   material: "carpaint",
   metalness: 0.55,
@@ -36,6 +34,14 @@ const GLASS_OPACITY: Record<string, number> = {
   clearglass: 0.28,
   redglass: 0.72,
 };
+
+/** Model material names this file relies on, a test checks that each exists in the shipped model. */
+export const TUNED_MATERIAL_NAMES: readonly string[] = [
+  PAINT.material,
+  ACCENT.material,
+  TYRE.material,
+  ...Object.keys(GLASS_OPACITY),
+];
 
 export interface VehicleMaterials {
   setPaintColour: (colour: string) => void;
@@ -65,7 +71,7 @@ function toAlphaGlass(material: Material, opacity: number) {
  * shared material, so a colour change is a single assignment and leaves clearcoat,
  * roughness and everything else untouched.
  */
-export function applyVehicleMaterials(root: Object3D, paintColour = DEFAULT_PAINT_COLOUR): VehicleMaterials {
+export function applyVehicleMaterials(root: Object3D, paintColour: string): VehicleMaterials {
   const paint = new MeshPhysicalMaterial({
     name: PAINT.material,
     color: new Color(paintColour),

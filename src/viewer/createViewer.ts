@@ -41,10 +41,16 @@ const MAX_POLAR_ANGLE = MathUtils.degToRad(87);
 export interface Viewer {
   resetView: () => void;
   setPaintColour: (colour: string) => void;
+  /** Hides exactly these named nodes and shows every other node that was hidden before. */
+  setHiddenNodes: (names: readonly string[]) => void;
   dispose: () => void;
 }
 
 export interface ViewerOptions {
+  /** Body colour used when the model first appears. */
+  paintColour: string;
+  /** Names of nodes that start hidden. */
+  hiddenNodes: readonly string[];
   /** Appended to asset URLs so a retry bypasses a cached failed response. */
   cacheBust?: string;
   onProgress?: (fraction: number) => void;
@@ -104,7 +110,16 @@ function groundPlane(texture: CanvasTexture, width: number, depth: number, y: nu
 
 export function createViewer(
   container: HTMLElement,
-  { cacheBust, onProgress, onLoaded, onError, onContextLost, onContextRestored }: ViewerOptions = {},
+  {
+    paintColour: initialPaintColour,
+    hiddenNodes: initialHiddenNodes,
+    cacheBust,
+    onProgress,
+    onLoaded,
+    onError,
+    onContextLost,
+    onContextRestored,
+  }: ViewerOptions,
 ): Viewer {
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
@@ -173,7 +188,19 @@ export function createViewer(
   const startTarget = new Vector3();
   let fitWidth = 5.6;
   let vehicleMaterials: VehicleMaterials | null = null;
-  let paintColour: string | undefined;
+  let paintColour = initialPaintColour;
+  let hiddenNodes = initialHiddenNodes;
+  const nodesByName = new Map<string, Object3D[]>();
+
+  // a name can match a wrapper group and its mesh, both are toggled together
+  const applyHiddenNodes = (previous: readonly string[]) => {
+    for (const name of previous) {
+      for (const node of nodesByName.get(name) ?? []) node.visible = true;
+    }
+    for (const name of hiddenNodes) {
+      for (const node of nodesByName.get(name) ?? []) node.visible = false;
+    }
+  };
 
   // Distance at which the vehicle length fits the horizontal field of view.
   const fitDistance = () => {
@@ -225,6 +252,12 @@ export function createViewer(
       if (disposed) return;
       model = gltf.scene;
       vehicleMaterials = applyVehicleMaterials(gltf.scene, paintColour);
+      gltf.scene.traverse((node) => {
+        const group = nodesByName.get(node.name);
+        if (group) group.push(node);
+        else nodesByName.set(node.name, [node]);
+      });
+      applyHiddenNodes([]);
       scene.add(gltf.scene);
 
       const box = new Box3().setFromObject(gltf.scene);
@@ -270,7 +303,15 @@ export function createViewer(
 
   return {
     resetView,
+    setHiddenNodes(names) {
+      if (names.length === hiddenNodes.length && names.every((name, i) => name === hiddenNodes[i])) return;
+      const previous = hiddenNodes;
+      hiddenNodes = names;
+      applyHiddenNodes(previous);
+      requestRender();
+    },
     setPaintColour(colour) {
+      if (colour === paintColour) return;
       paintColour = colour;
       vehicleMaterials?.setPaintColour(colour);
       requestRender();

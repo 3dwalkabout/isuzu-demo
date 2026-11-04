@@ -18,9 +18,16 @@ body {
 }
 
 .app {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 .viewer {
@@ -67,15 +74,121 @@ body {
   cursor: pointer;
 }
 
-.reset-view {
+:focus-visible {
+  outline: 2px solid #58d1e0;
+  outline-offset: 2px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 16px;
+  border-top: 1px solid #2a2d31;
+  background: linear-gradient(to top, #0d0e10, #16181b);
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar .icon-control {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 72px;
+  padding: 8px 10px 10px;
+}
+
+.toolbar .icon-control:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.panel {
   position: absolute;
-  right: 16px;
   bottom: 16px;
-  padding: 8px 14px;
-  border: 1px solid #58d1e0;
-  border-radius: 4px;
-  background: transparent;
-  color: #58d1e0;
-  font: inherit;
+  left: 50%;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  width: min(calc(100% - 32px), 560px);
+  padding: 14px 16px;
+  border: 1px solid #2f3337;
+  border-radius: 6px;
+  background: rgb(22 24 27 / 0.85);
+  transform: translateX(-50%);
+}
+
+.panel-caption {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  outline: 1px solid #5a5e63;
   cursor: pointer;
+}
+
+.swatch[aria-pressed="true"] {
+  border-color: #16181b;
+  outline: 2px solid #58d1e0;
+}
+
+.accessory-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+}
+
+.accessory-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  .swatch {
+    width: 40px;
+    height: 40px;
+  }
+
+  .accessory-list label {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --icon-size: 40px;
+  }
+
+  .toolbar {
+    padding: 2px 8px;
+  }
+
+  .toolbar .icon-control {
+    min-width: 64px;
+  }
 }
