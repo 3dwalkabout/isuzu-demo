@@ -1,5 +1,5 @@
-import { ACCESSORIES } from "@/config/accessories";
-import { DEFAULT_COLOUR_ID } from "@/config/colours";
+import { ACCESSORIES } from "../config/accessories.ts";
+import { DEFAULT_COLOUR_ID, PAINT_COLOURS } from "../config/colours.ts";
 
 export interface Configuration {
   colourId: string;
@@ -18,13 +18,21 @@ export function initialConfiguration(): Configuration {
   };
 }
 
+/** Unknown ids are ignored so the state only ever holds configured options. */
 export function configurationReducer(state: Configuration, action: ConfigurationAction): Configuration {
   switch (action.type) {
     case "selectColour":
-      return action.colourId === state.colourId ? state : { ...state, colourId: action.colourId };
+      if (action.colourId === state.colourId || !PAINT_COLOURS.some((c) => c.id === action.colourId)) return state;
+      return { ...state, colourId: action.colourId };
     case "setAccessory":
-      return state.accessories[action.accessoryId] === action.visible
-        ? state
-        : { ...state, accessories: { ...state.accessories, [action.accessoryId]: action.visible } };
+      if (!(action.accessoryId in state.accessories) || state.accessories[action.accessoryId] === action.visible) {
+        return state;
+      }
+      return { ...state, accessories: { ...state.accessories, [action.accessoryId]: action.visible } };
   }
+}
+
+/** Names of every model node that must be hidden for this configuration. */
+export function hiddenNodes(configuration: Configuration): string[] {
+  return ACCESSORIES.filter((a) => !configuration.accessories[a.id]).flatMap((a) => a.nodes);
 }

@@ -8,11 +8,11 @@
     "build": "tsc --noEmit --incremental false && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "node --test src/config/*.test.ts",
+    "test": "node --test \"src/**/*.test.ts\"",
     "optimise-model": "node scripts/optimise-model.mjs"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.18.0"
   },
   "dependencies": {
     "react": "^19.3.1",

@@ -1,6 +1,7 @@
-import { useEffect, useReducer, useRef, useState } from "react";
-import { PAINT_COLOURS } from "@/config/colours";
-import { configurationReducer, initialConfiguration } from "@/state/configuration";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { ACCESSORIES } from "@/config/accessories";
+import { PAINT_COLOURS, getPaintColour } from "@/config/colours";
+import { configurationReducer, hiddenNodes, initialConfiguration } from "@/state/configuration";
 import { createViewer, type Viewer } from "@/viewer/createViewer";
 
 type Status = "loading" | "ready" | "failed" | "unsupported" | "lost";
@@ -18,7 +19,8 @@ export function App() {
   const [progress, setProgress] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [configuration, dispatch] = useReducer(configurationReducer, undefined, initialConfiguration);
-  const paintHex = PAINT_COLOURS.find((c) => c.id === configuration.colourId)?.hex;
+  const colour = getPaintColour(configuration.colourId);
+  const hidden = useMemo(() => hiddenNodes(configuration), [configuration.accessories]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -28,6 +30,8 @@ export function App() {
     let viewer: Viewer;
     try {
       viewer = createViewer(container, {
+        paintColour: colour.hex,
+        hiddenNodes: hidden,
         cacheBust: attempt > 0 ? String(attempt) : undefined,
         onProgress: setProgress,
         onLoaded: () => setStatus("ready"),
@@ -40,17 +44,20 @@ export function App() {
       return;
     }
     viewerRef.current = viewer;
-    if (paintHex) viewer.setPaintColour(paintHex);
     return () => {
       viewer.dispose();
       viewerRef.current = null;
     };
-    // paintHex is applied by the effect below, a retry recreates the viewer with the current colour.
+    // a retry recreates the viewer from the configuration of that render, later changes go through the effects below
   }, [attempt]);
 
   useEffect(() => {
-    if (paintHex) viewerRef.current?.setPaintColour(paintHex);
-  }, [paintHex]);
+    viewerRef.current?.setPaintColour(colour.hex);
+  }, [colour.hex]);
+
+  useEffect(() => {
+    viewerRef.current?.setHiddenNodes(hidden);
+  }, [hidden]);
 
   return (
     <main className="app">
@@ -67,19 +74,37 @@ export function App() {
       )}
       {status === "ready" && (
         <div className="swatches" role="group" aria-label="Body colour">
-          {PAINT_COLOURS.map((colour) => (
+          {PAINT_COLOURS.map((option) => (
             <button
-              key={colour.id}
+              key={option.id}
               type="button"
               className="swatch"
-              style={{ backgroundColor: colour.hex }}
-              aria-label={colour.name}
-              aria-pressed={colour.id === configuration.colourId}
-              title={colour.name}
-              onClick={() => dispatch({ type: "selectColour", colourId: colour.id })}
+              style={{ backgroundColor: option.hex }}
+              aria-label={option.name}
+              aria-pressed={option.id === configuration.colourId}
+              title={option.name}
+              onClick={() => dispatch({ type: "selectColour", colourId: option.id })}
             />
           ))}
+          <p className="swatch-name">{colour.name}</p>
         </div>
+      )}
+      {status === "ready" && (
+        <fieldset className="accessories">
+          <legend>Accessories</legend>
+          {ACCESSORIES.map((accessory) => (
+            <label key={accessory.id}>
+              <input
+                type="checkbox"
+                checked={configuration.accessories[accessory.id]}
+                onChange={(event) =>
+                  dispatch({ type: "setAccessory", accessoryId: accessory.id, visible: event.target.checked })
+                }
+              />
+              {accessory.label}
+            </label>
+          ))}
+        </fieldset>
       )}
       {status !== "loading" && status !== "ready" && (
         <div className="viewer-status viewer-status--message" role="alert">

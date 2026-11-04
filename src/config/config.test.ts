@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { ACCESSORIES } from "./accessories.ts";
-import { DEFAULT_COLOUR_ID, PAINT_COLOURS } from "./colours.ts";
+import { TUNED_MATERIAL_NAMES } from "../viewer/materials.ts";
+import { DEFAULT_COLOUR_ID, PAINT_COLOURS, getPaintColour } from "./colours.ts";
 
 interface GltfJson {
   nodes: { name?: string }[];
@@ -35,8 +36,15 @@ test("every colour has a name and a six digit hex value", () => {
   }
 });
 
-test("the paint material exists in the shipped model", () => {
-  assert.ok(materialNames.has("carpaint"));
+test("every material tuned in code exists in the shipped model", () => {
+  for (const name of TUNED_MATERIAL_NAMES) {
+    assert.ok(materialNames.has(name), `material "${name}" is not in the model`);
+  }
+});
+
+test("colour lookup returns the colour and rejects an unknown id", () => {
+  assert.equal(getPaintColour(DEFAULT_COLOUR_ID).id, DEFAULT_COLOUR_ID);
+  assert.throws(() => getPaintColour("no-such-colour"));
 });
 
 test("accessory ids are unique and each has a label and nodes", () => {
