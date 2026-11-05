@@ -30,10 +30,13 @@ const TYRE = { material: "tire", roughness: 0.85 } as const;
 
 /** Opacity of each exported glass material when drawn as alpha blending. */
 const GLASS_OPACITY: Record<string, number> = {
-  windowglass: 0.32,
+  windowglass: 0.7,
   clearglass: 0.28,
   redglass: 0.72,
 };
+
+/** Window glass is tinted dark so the bright interior does not show through. */
+const WINDOW_TINT = { material: "windowglass", colour: "#1b2225" } as const;
 
 /** Model material names this file relies on, a test checks that each exists in the shipped model. */
 export const TUNED_MATERIAL_NAMES: readonly string[] = [
@@ -63,6 +66,7 @@ function toAlphaGlass(material: Material, opacity: number) {
   glass.opacity = opacity;
   glass.depthWrite = false;
   glass.envMapIntensity = 1.5;
+  if (material.name === WINDOW_TINT.material) glass.color.set(WINDOW_TINT.colour);
   glass.needsUpdate = true;
 }
 

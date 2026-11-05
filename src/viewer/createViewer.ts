@@ -37,6 +37,10 @@ const START_ELEVATION = MathUtils.degToRad(11);
 const MIN_DISTANCE = 4.5;
 const MAX_DISTANCE = 14;
 const MAX_POLAR_ANGLE = MathUtils.degToRad(87);
+/** Share of the window the vehicle may fill along its limiting axis. */
+const FRAMING_FILL = 1.1;
+/** Metres the orbit target sits below the usual centre, so the vehicle clears the panel at the bottom. */
+const FRAMING_LIFT = 0.2;
 
 export interface Viewer {
   resetView: () => void;
@@ -148,6 +152,9 @@ export function createViewer(
     });
   };
   controls.addEventListener("change", requestRender);
+  controls.addEventListener("start", () => {
+    userMoved = true;
+  });
 
   const canvas = renderer.domElement;
   const handleContextLost = (event: Event) => {
@@ -164,12 +171,16 @@ export function createViewer(
   canvas.addEventListener("webglcontextlost", handleContextLost);
   canvas.addEventListener("webglcontextrestored", handleContextRestored);
 
+  const corners: Vector3[] = [];
+  let userMoved = false;
+
   const resize = () => {
     const { clientWidth: width, clientHeight: height } = container;
     if (!width || !height) return;
     renderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    if (corners.length && !userMoved) resetView();
     requestRender();
   };
   const observer = new ResizeObserver(resize);
@@ -186,7 +197,6 @@ export function createViewer(
   let environment: Texture | null = null;
   const disposables: { dispose: () => void }[] = [];
   const startTarget = new Vector3();
-  let fitWidth = 5.6;
   let vehicleMaterials: VehicleMaterials | null = null;
   let paintColour = initialPaintColour;
   let hiddenNodes = initialHiddenNodes;
@@ -202,23 +212,33 @@ export function createViewer(
     }
   };
 
-  // Distance at which the vehicle length fits the horizontal field of view.
-  const fitDistance = () => {
-    const halfHorizontal = Math.atan(Math.tan(MathUtils.degToRad(FOV) / 2) * camera.aspect);
-    const distance = fitWidth / 2 / Math.tan(halfHorizontal);
-    return MathUtils.clamp(distance, MIN_DISTANCE * 1.4, MAX_DISTANCE * 0.8);
+  // Distance from the target, along the start direction, at which all eight corners of the
+  // vehicle bounds fit inside both fields of view.
+  const fitDistance = (direction: Vector3) => {
+    const right = new Vector3(0, 1, 0).cross(direction).normalize();
+    const up = new Vector3().crossVectors(direction, right);
+    const tanV = Math.tan(MathUtils.degToRad(FOV) / 2) * FRAMING_FILL;
+    const tanH = tanV * camera.aspect;
+    let distance = 0;
+    for (const corner of corners) {
+      const offset = corner.clone().sub(startTarget);
+      const depth = offset.dot(direction);
+      distance = Math.max(distance, depth + Math.abs(offset.dot(right)) / tanH, depth + Math.abs(offset.dot(up)) / tanV);
+    }
+    return MathUtils.clamp(distance, MIN_DISTANCE, MAX_DISTANCE * 0.8);
   };
 
   const resetView = () => {
-    const distance = fitDistance();
-    const horizontal = Math.cos(START_ELEVATION) * distance;
-    camera.position.set(
-      startTarget.x + Math.sin(START_AZIMUTH) * horizontal,
-      startTarget.y + Math.sin(START_ELEVATION) * distance,
-      startTarget.z + Math.cos(START_AZIMUTH) * horizontal,
+    const horizontal = Math.cos(START_ELEVATION);
+    const direction = new Vector3(
+      Math.sin(START_AZIMUTH) * horizontal,
+      Math.sin(START_ELEVATION),
+      Math.cos(START_AZIMUTH) * horizontal,
     );
+    camera.position.copy(startTarget).addScaledVector(direction, fitDistance(direction));
     controls.target.copy(startTarget);
     controls.update();
+    userMoved = false;
     requestRender();
   };
 
@@ -283,8 +303,12 @@ export function createViewer(
       scene.add(floor, shadow);
       disposables.push(floor.geometry, floor.material, shadow.geometry, shadow.material);
 
-      startTarget.set(centre.x, box.min.y + size.y * 0.42, centre.z);
-      fitWidth = Math.hypot(size.x, size.z) * 0.95;
+      startTarget.set(centre.x, box.min.y + size.y * 0.42 - FRAMING_LIFT, centre.z);
+      for (const x of [box.min.x, box.max.x]) {
+        for (const y of [box.min.y, box.max.y]) {
+          for (const z of [box.min.z, box.max.z]) corners.push(new Vector3(x, y, z));
+        }
+      }
       camera.near = 0.2;
       camera.far = 80;
       camera.updateProjectionMatrix();
