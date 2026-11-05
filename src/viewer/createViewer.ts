@@ -3,6 +3,7 @@ import {
   Box3,
   CanvasTexture,
   Color,
+  DirectionalLight,
   DoubleSide,
   EquirectangularReflectionMapping,
   MathUtils,
@@ -23,13 +24,13 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { LOOK, RENDER_ORDER } from "./look";
 import { applyVehicleMaterials, type VehicleMaterials } from "./materials";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/dmax.glb`;
 const HDRI_URL = `${import.meta.env.BASE_URL}hdri/studio.hdr`;
 const withBust = (url: string, bust?: string) => (bust ? `${url}?r=${encodeURIComponent(bust)}` : url);
 const MAX_PIXEL_RATIO = 2;
-const BACKGROUND = "#16181b";
 
 const FOV = 30;
 const START_AZIMUTH = MathUtils.degToRad(38);
@@ -82,7 +83,7 @@ function disposeObject(root: Object3D) {
   });
 }
 
-function radialTexture(stops: [number, string][]): CanvasTexture {
+function radialTexture(stops: readonly (readonly [number, string])[]): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 256;
   const ctx = canvas.getContext("2d");
@@ -96,7 +97,7 @@ function radialTexture(stops: [number, string][]): CanvasTexture {
   return texture;
 }
 
-function groundPlane(texture: CanvasTexture, width: number, depth: number, y: number) {
+function groundPlane(texture: CanvasTexture, width: number, depth: number, y: number, renderOrder: number) {
   const mesh = new Mesh(
     new PlaneGeometry(width, depth),
     new MeshBasicMaterial({
@@ -109,6 +110,7 @@ function groundPlane(texture: CanvasTexture, width: number, depth: number, y: nu
   );
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = y;
+  mesh.renderOrder = renderOrder;
   return mesh;
 }
 
@@ -128,11 +130,19 @@ export function createViewer(
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1;
+  renderer.toneMappingExposure = LOOK.exposure;
   container.appendChild(renderer.domElement);
 
   const scene = new Scene();
-  scene.background = new Color(BACKGROUND);
+  const backdrop = radialTexture(LOOK.backdrop.stops);
+  scene.background = backdrop;
+  scene.environmentIntensity = LOOK.environment.intensity;
+  scene.environmentRotation.y = LOOK.environment.rotationY;
+  for (const { colour, intensity, position } of Object.values(LOOK.lights)) {
+    const light = new DirectionalLight(new Color(colour), intensity);
+    light.position.fromArray(position);
+    scene.add(light);
+  }
   const pmrem = new PMREMGenerator(renderer);
 
   const camera = new PerspectiveCamera(FOV, 1, 0.1, 100);
@@ -195,7 +205,7 @@ export function createViewer(
     if (pending === 0 && !disposed) onLoaded?.();
   };
   let environment: Texture | null = null;
-  const disposables: { dispose: () => void }[] = [];
+  const disposables: { dispose: () => void }[] = [backdrop];
   const startTarget = new Vector3();
   let vehicleMaterials: VehicleMaterials | null = null;
   let paintColour = initialPaintColour;
@@ -284,24 +294,32 @@ export function createViewer(
       const centre = box.getCenter(new Vector3());
       const size = box.getSize(new Vector3());
 
-      // Floor falls off into the background, the contact shadow sits on top of it.
-      const floorTexture = radialTexture([
-        [0, "rgba(58,62,68,1)"],
-        [0.55, "rgba(32,35,39,0.6)"],
-        [1, "rgba(22,24,27,0)"],
-      ]);
-      const shadowTexture = radialTexture([
-        [0, "rgba(0,0,0,0.85)"],
-        [0.45, "rgba(0,0,0,0.5)"],
-        [1, "rgba(0,0,0,0)"],
-      ]);
-      disposables.push(floorTexture, shadowTexture);
-      const floor = groundPlane(floorTexture, 26, 26, 0);
-      const shadow = groundPlane(shadowTexture, size.x * 1.9, size.z * 1.25, 0.004);
-      shadow.position.x = centre.x;
-      shadow.position.z = centre.z;
-      scene.add(floor, shadow);
-      disposables.push(floor.geometry, floor.material, shadow.geometry, shadow.material);
+      // floor and shadows are transparent planes at almost the same height, so draw order is explicit
+      const floorTexture = radialTexture(LOOK.floor.stops);
+      const softTexture = radialTexture(LOOK.shadows.soft.stops);
+      const contactTexture = radialTexture(LOOK.shadows.contact.stops);
+      disposables.push(floorTexture, softTexture, contactTexture);
+      const floor = groundPlane(floorTexture, LOOK.floor.size, LOOK.floor.size, 0, RENDER_ORDER.floor);
+      const soft = groundPlane(
+        softTexture,
+        size.x * LOOK.shadows.soft.widthScale,
+        size.z * LOOK.shadows.soft.depthScale,
+        0.004,
+        RENDER_ORDER.softShadow,
+      );
+      const contact = groundPlane(
+        contactTexture,
+        size.x * LOOK.shadows.contact.widthScale,
+        size.z * LOOK.shadows.contact.depthScale,
+        0.006,
+        RENDER_ORDER.contactShadow,
+      );
+      for (const shadow of [soft, contact]) {
+        shadow.position.x = centre.x;
+        shadow.position.z = centre.z;
+      }
+      scene.add(floor, soft, contact);
+      for (const plane of [floor, soft, contact]) disposables.push(plane.geometry, plane.material);
 
       startTarget.set(centre.x, box.min.y + size.y * 0.42 - FRAMING_LIFT, centre.z);
       for (const x of [box.min.x, box.max.x]) {
