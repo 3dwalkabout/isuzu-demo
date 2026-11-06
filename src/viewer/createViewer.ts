@@ -3,6 +3,7 @@ import {
   Box3,
   CanvasTexture,
   Color,
+  DirectionalLight,
   DoubleSide,
   EquirectangularReflectionMapping,
   MathUtils,
@@ -19,17 +20,18 @@ import {
   type Object3D,
   type Texture,
 } from "three";
+import { GroundedSkybox } from "three/addons/objects/GroundedSkybox.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { LOOK, RENDER_ORDER } from "./look";
 import { applyVehicleMaterials, type VehicleMaterials } from "./materials";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/dmax.glb`;
-const HDRI_URL = `${import.meta.env.BASE_URL}hdri/studio.hdr`;
+const HDRI_URL = `${import.meta.env.BASE_URL}hdri/${LOOK.environment.file}`;
 const withBust = (url: string, bust?: string) => (bust ? `${url}?r=${encodeURIComponent(bust)}` : url);
 const MAX_PIXEL_RATIO = 2;
-const BACKGROUND = "#16181b";
 
 const FOV = 30;
 const START_AZIMUTH = MathUtils.degToRad(38);
@@ -37,6 +39,10 @@ const START_ELEVATION = MathUtils.degToRad(11);
 const MIN_DISTANCE = 4.5;
 const MAX_DISTANCE = 14;
 const MAX_POLAR_ANGLE = MathUtils.degToRad(87);
+/** Share of the window the vehicle may fill along its limiting axis. */
+const FRAMING_FILL = 1.1;
+/** Metres the orbit target sits below the usual centre, so the vehicle clears the panel at the bottom. */
+const FRAMING_LIFT = 0.2;
 
 export interface Viewer {
   resetView: () => void;
@@ -78,7 +84,7 @@ function disposeObject(root: Object3D) {
   });
 }
 
-function radialTexture(stops: [number, string][]): CanvasTexture {
+function radialTexture(stops: readonly (readonly [number, string])[]): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 256;
   const ctx = canvas.getContext("2d");
@@ -92,7 +98,7 @@ function radialTexture(stops: [number, string][]): CanvasTexture {
   return texture;
 }
 
-function groundPlane(texture: CanvasTexture, width: number, depth: number, y: number) {
+function groundPlane(texture: CanvasTexture, width: number, depth: number, y: number, renderOrder: number) {
   const mesh = new Mesh(
     new PlaneGeometry(width, depth),
     new MeshBasicMaterial({
@@ -105,6 +111,7 @@ function groundPlane(texture: CanvasTexture, width: number, depth: number, y: nu
   );
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = y;
+  mesh.renderOrder = renderOrder;
   return mesh;
 }
 
@@ -124,11 +131,17 @@ export function createViewer(
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1;
+  renderer.toneMappingExposure = LOOK.exposure;
   container.appendChild(renderer.domElement);
 
   const scene = new Scene();
-  scene.background = new Color(BACKGROUND);
+  scene.environmentIntensity = LOOK.environment.intensity;
+  scene.environmentRotation.y = LOOK.environment.rotationY;
+  for (const { colour, intensity, position } of Object.values(LOOK.lights)) {
+    const light = new DirectionalLight(new Color(colour), intensity);
+    light.position.fromArray(position);
+    scene.add(light);
+  }
   const pmrem = new PMREMGenerator(renderer);
 
   const camera = new PerspectiveCamera(FOV, 1, 0.1, 100);
@@ -148,6 +161,9 @@ export function createViewer(
     });
   };
   controls.addEventListener("change", requestRender);
+  controls.addEventListener("start", () => {
+    userMoved = true;
+  });
 
   const canvas = renderer.domElement;
   const handleContextLost = (event: Event) => {
@@ -164,12 +180,16 @@ export function createViewer(
   canvas.addEventListener("webglcontextlost", handleContextLost);
   canvas.addEventListener("webglcontextrestored", handleContextRestored);
 
+  const corners: Vector3[] = [];
+  let userMoved = false;
+
   const resize = () => {
     const { clientWidth: width, clientHeight: height } = container;
     if (!width || !height) return;
     renderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    if (corners.length && !userMoved) resetView();
     requestRender();
   };
   const observer = new ResizeObserver(resize);
@@ -184,9 +204,9 @@ export function createViewer(
     if (pending === 0 && !disposed) onLoaded?.();
   };
   let environment: Texture | null = null;
+  let backgroundImage: Texture | null = null;
   const disposables: { dispose: () => void }[] = [];
   const startTarget = new Vector3();
-  let fitWidth = 5.6;
   let vehicleMaterials: VehicleMaterials | null = null;
   let paintColour = initialPaintColour;
   let hiddenNodes = initialHiddenNodes;
@@ -202,23 +222,33 @@ export function createViewer(
     }
   };
 
-  // Distance at which the vehicle length fits the horizontal field of view.
-  const fitDistance = () => {
-    const halfHorizontal = Math.atan(Math.tan(MathUtils.degToRad(FOV) / 2) * camera.aspect);
-    const distance = fitWidth / 2 / Math.tan(halfHorizontal);
-    return MathUtils.clamp(distance, MIN_DISTANCE * 1.4, MAX_DISTANCE * 0.8);
+  // Distance from the target, along the start direction, at which all eight corners of the
+  // vehicle bounds fit inside both fields of view.
+  const fitDistance = (direction: Vector3) => {
+    const right = new Vector3(0, 1, 0).cross(direction).normalize();
+    const up = new Vector3().crossVectors(direction, right);
+    const tanV = Math.tan(MathUtils.degToRad(FOV) / 2) * FRAMING_FILL;
+    const tanH = tanV * camera.aspect;
+    let distance = 0;
+    for (const corner of corners) {
+      const offset = corner.clone().sub(startTarget);
+      const depth = offset.dot(direction);
+      distance = Math.max(distance, depth + Math.abs(offset.dot(right)) / tanH, depth + Math.abs(offset.dot(up)) / tanV);
+    }
+    return MathUtils.clamp(distance, MIN_DISTANCE, MAX_DISTANCE * 0.8);
   };
 
   const resetView = () => {
-    const distance = fitDistance();
-    const horizontal = Math.cos(START_ELEVATION) * distance;
-    camera.position.set(
-      startTarget.x + Math.sin(START_AZIMUTH) * horizontal,
-      startTarget.y + Math.sin(START_ELEVATION) * distance,
-      startTarget.z + Math.cos(START_AZIMUTH) * horizontal,
+    const horizontal = Math.cos(START_ELEVATION);
+    const direction = new Vector3(
+      Math.sin(START_AZIMUTH) * horizontal,
+      Math.sin(START_ELEVATION),
+      Math.cos(START_AZIMUTH) * horizontal,
     );
+    camera.position.copy(startTarget).addScaledVector(direction, fitDistance(direction));
     controls.target.copy(startTarget);
     controls.update();
+    userMoved = false;
     requestRender();
   };
 
@@ -231,7 +261,13 @@ export function createViewer(
       }
       texture.mapping = EquirectangularReflectionMapping;
       const target = pmrem.fromEquirectangular(texture);
-      texture.dispose();
+      // the full image stays alive on the dome, the filtered copy lights the vehicle
+      backgroundImage = texture;
+      const dome = new GroundedSkybox(texture, LOOK.environment.height, LOOK.environment.radius);
+      dome.position.y = LOOK.environment.height;
+      dome.rotation.y = LOOK.environment.rotationY;
+      scene.add(dome);
+      disposables.push(dome.geometry, dome.material);
       environment = target.texture;
       scene.environment = environment;
       disposables.push(target);
@@ -264,29 +300,39 @@ export function createViewer(
       const centre = box.getCenter(new Vector3());
       const size = box.getSize(new Vector3());
 
-      // Floor falls off into the background, the contact shadow sits on top of it.
-      const floorTexture = radialTexture([
-        [0, "rgba(58,62,68,1)"],
-        [0.55, "rgba(32,35,39,0.6)"],
-        [1, "rgba(22,24,27,0)"],
-      ]);
-      const shadowTexture = radialTexture([
-        [0, "rgba(0,0,0,0.85)"],
-        [0.45, "rgba(0,0,0,0.5)"],
-        [1, "rgba(0,0,0,0)"],
-      ]);
-      disposables.push(floorTexture, shadowTexture);
-      const floor = groundPlane(floorTexture, 26, 26, 0);
-      const shadow = groundPlane(shadowTexture, size.x * 1.9, size.z * 1.25, 0.004);
-      shadow.position.x = centre.x;
-      shadow.position.z = centre.z;
-      scene.add(floor, shadow);
-      disposables.push(floor.geometry, floor.material, shadow.geometry, shadow.material);
+      // the two shadows are transparent planes at almost the same height, so draw order is explicit
+      const softTexture = radialTexture(LOOK.shadows.soft.stops);
+      const contactTexture = radialTexture(LOOK.shadows.contact.stops);
+      disposables.push(softTexture, contactTexture);
+      const soft = groundPlane(
+        softTexture,
+        size.x * LOOK.shadows.soft.widthScale,
+        size.z * LOOK.shadows.soft.depthScale,
+        0.004,
+        RENDER_ORDER.softShadow,
+      );
+      const contact = groundPlane(
+        contactTexture,
+        size.x * LOOK.shadows.contact.widthScale,
+        size.z * LOOK.shadows.contact.depthScale,
+        0.006,
+        RENDER_ORDER.contactShadow,
+      );
+      for (const shadow of [soft, contact]) {
+        shadow.position.x = centre.x;
+        shadow.position.z = centre.z;
+      }
+      scene.add(soft, contact);
+      for (const plane of [soft, contact]) disposables.push(plane.geometry, plane.material);
 
-      startTarget.set(centre.x, box.min.y + size.y * 0.42, centre.z);
-      fitWidth = Math.hypot(size.x, size.z) * 0.95;
+      startTarget.set(centre.x, box.min.y + size.y * 0.42 - FRAMING_LIFT, centre.z);
+      for (const x of [box.min.x, box.max.x]) {
+        for (const y of [box.min.y, box.max.y]) {
+          for (const z of [box.min.z, box.max.z]) corners.push(new Vector3(x, y, z));
+        }
+      }
       camera.near = 0.2;
-      camera.far = 80;
+      camera.far = LOOK.environment.radius * 3;
       camera.updateProjectionMatrix();
       resetView();
 
@@ -327,6 +373,7 @@ export function createViewer(
       for (const item of disposables) item.dispose();
       vehicleMaterials?.dispose();
       environment?.dispose();
+      backgroundImage?.dispose();
       pmrem.dispose();
       renderer.dispose();
       renderer.domElement.remove();

@@ -26,20 +26,35 @@ const ACCENT = {
   roughness: 0.35,
 } as const;
 
-const TYRE = { material: "tire", roughness: 0.85 } as const;
+/** The exported tyre normal map is a flat sidewall print, not surface detail, and lights the rubber grey. */
+const TYRE = { material: "tire", roughness: 0.9 } as const;
+
+/** Black plastic trim exports at roughness 0.3, which mirrors the environment as a grey sheen on lamp frames and bumpers, so it is kept fully matte. */
+const TRIM = { material: "black", roughness: 1, envMapIntensity: 0 } as const;
 
 /** Opacity of each exported glass material when drawn as alpha blending. */
 const GLASS_OPACITY: Record<string, number> = {
-  windowglass: 0.32,
-  clearglass: 0.28,
+  windowglass: 0.7,
+  clearglass: 0.12,
   redglass: 0.72,
 };
+
+/** Reflection strength per glass material, lamp covers stay low so they do not wash out. */
+const GLASS_REFLECTION: Record<string, number> = {
+  windowglass: 0.25,
+  clearglass: 0.6,
+  redglass: 0.6,
+};
+
+/** Window glass is tinted dark so the bright interior does not show through, and kept slightly rough so the studio does not mirror on it. */
+const WINDOW_TINT = { material: "windowglass", colour: "#1b2225", roughness: 0.25 } as const;
 
 /** Model material names this file relies on, a test checks that each exists in the shipped model. */
 export const TUNED_MATERIAL_NAMES: readonly string[] = [
   PAINT.material,
   ACCENT.material,
   TYRE.material,
+  TRIM.material,
   ...Object.keys(GLASS_OPACITY),
 ];
 
@@ -62,7 +77,9 @@ function toAlphaGlass(material: Material, opacity: number) {
   glass.transparent = true;
   glass.opacity = opacity;
   glass.depthWrite = false;
-  glass.envMapIntensity = 1.5;
+  if (material.name === WINDOW_TINT.material) glass.roughness = WINDOW_TINT.roughness;
+  glass.envMapIntensity = GLASS_REFLECTION[material.name] ?? 1;
+  if (material.name === WINDOW_TINT.material) glass.color.set(WINDOW_TINT.colour);
   glass.needsUpdate = true;
 }
 
@@ -97,7 +114,15 @@ export function applyVehicleMaterials(root: Object3D, paintColour: string): Vehi
       replaced.add(material);
       mesh.material = accent;
     } else if (material.name === TYRE.material) {
-      (material as MeshPhysicalMaterial).roughness = TYRE.roughness;
+      const tyre = material as MeshPhysicalMaterial;
+      tyre.roughness = TYRE.roughness;
+      tyre.normalMap?.dispose();
+      tyre.normalMap = null;
+      tyre.needsUpdate = true;
+    } else if (material.name === TRIM.material) {
+      const trim = material as MeshPhysicalMaterial;
+      trim.roughness = TRIM.roughness;
+      trim.envMapIntensity = TRIM.envMapIntensity;
     } else if (GLASS_MODE === "alpha" && material.name in GLASS_OPACITY) {
       toAlphaGlass(material, GLASS_OPACITY[material.name]);
     }
