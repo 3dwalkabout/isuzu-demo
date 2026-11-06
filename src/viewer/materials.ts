@@ -29,8 +29,8 @@ const ACCENT = {
 /** The exported tyre normal map is a flat sidewall print, not surface detail, and lights the rubber grey. */
 const TYRE = { material: "tire", roughness: 0.9 } as const;
 
-/** Black plastic trim exports at roughness 0.3, which mirrors the studio as a grey sheen on lamp frames and bumpers. */
-const TRIM = { material: "black", roughness: 0.6, envMapIntensity: 0.3 } as const;
+/** Black plastic trim exports at roughness 0.3, which mirrors the environment as a grey sheen on lamp frames and bumpers, so it is kept fully matte. */
+const TRIM = { material: "black", roughness: 1, envMapIntensity: 0 } as const;
 
 /** Opacity of each exported glass material when drawn as alpha blending. */
 const GLASS_OPACITY: Record<string, number> = {
