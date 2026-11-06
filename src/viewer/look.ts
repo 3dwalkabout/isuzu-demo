@@ -15,7 +15,7 @@ export const LOOK = {
     file: "autoshop_01_1k.hdr",
     intensity: 1,
     rotationY: MathUtils.degToRad(0),
-    height: 4,
+    height: 6,
     radius: 40,
   },
   /** Directional lights that add crisp highlights on top of the environment. */
