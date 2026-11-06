@@ -33,6 +33,12 @@ Colours and accessories are data, edit them without touching other code:
 
 `npm test` checks that every accessory node and every tuned material name exists in `public/models/dmax.glb`, so a renamed node after re-running `npm run optimise-model` fails the test instead of leaving a dead control.
 
+## Scene look
+
+`src/viewer/look.ts` holds every value that sets the look of the scene: exposure, environment file, intensity, rotation, dome height and radius, lights and shadows. The environment image lights the vehicle and is also projected onto a dome with a real floor (`GroundedSkybox`), so reflections match the room and zooming changes how the room looks. Dome height is the eye height of the photo and sets how large the room appears, a lower value warps the floor.
+
+The environment is `autoshop_01` (1K) from [Poly Haven](https://polyhaven.com/a/autoshop_01), released under CC0. To swap it, put another `.hdr` in `public/hdri/` and change `environment.file`. A new image changes every reflection, so recheck rotation and paint on light and dark colours.
+
 ## Layout
 
 - `src/assets/icons/` prepared toolbar icons, inlined so they follow `currentColor`

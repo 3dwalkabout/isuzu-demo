@@ -20,6 +20,7 @@ import {
   type Object3D,
   type Texture,
 } from "three";
+import { GroundedSkybox } from "three/addons/objects/GroundedSkybox.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
@@ -28,7 +29,7 @@ import { LOOK, RENDER_ORDER } from "./look";
 import { applyVehicleMaterials, type VehicleMaterials } from "./materials";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/dmax.glb`;
-const HDRI_URL = `${import.meta.env.BASE_URL}hdri/studio.hdr`;
+const HDRI_URL = `${import.meta.env.BASE_URL}hdri/${LOOK.environment.file}`;
 const withBust = (url: string, bust?: string) => (bust ? `${url}?r=${encodeURIComponent(bust)}` : url);
 const MAX_PIXEL_RATIO = 2;
 
@@ -134,8 +135,6 @@ export function createViewer(
   container.appendChild(renderer.domElement);
 
   const scene = new Scene();
-  const backdrop = radialTexture(LOOK.backdrop.stops);
-  scene.background = backdrop;
   scene.environmentIntensity = LOOK.environment.intensity;
   scene.environmentRotation.y = LOOK.environment.rotationY;
   for (const { colour, intensity, position } of Object.values(LOOK.lights)) {
@@ -205,7 +204,8 @@ export function createViewer(
     if (pending === 0 && !disposed) onLoaded?.();
   };
   let environment: Texture | null = null;
-  const disposables: { dispose: () => void }[] = [backdrop];
+  let backgroundImage: Texture | null = null;
+  const disposables: { dispose: () => void }[] = [];
   const startTarget = new Vector3();
   let vehicleMaterials: VehicleMaterials | null = null;
   let paintColour = initialPaintColour;
@@ -261,7 +261,13 @@ export function createViewer(
       }
       texture.mapping = EquirectangularReflectionMapping;
       const target = pmrem.fromEquirectangular(texture);
-      texture.dispose();
+      // the full image stays alive on the dome, the filtered copy lights the vehicle
+      backgroundImage = texture;
+      const dome = new GroundedSkybox(texture, LOOK.environment.height, LOOK.environment.radius);
+      dome.position.y = LOOK.environment.height;
+      dome.rotation.y = LOOK.environment.rotationY;
+      scene.add(dome);
+      disposables.push(dome.geometry, dome.material);
       environment = target.texture;
       scene.environment = environment;
       disposables.push(target);
@@ -294,12 +300,10 @@ export function createViewer(
       const centre = box.getCenter(new Vector3());
       const size = box.getSize(new Vector3());
 
-      // floor and shadows are transparent planes at almost the same height, so draw order is explicit
-      const floorTexture = radialTexture(LOOK.floor.stops);
+      // the two shadows are transparent planes at almost the same height, so draw order is explicit
       const softTexture = radialTexture(LOOK.shadows.soft.stops);
       const contactTexture = radialTexture(LOOK.shadows.contact.stops);
-      disposables.push(floorTexture, softTexture, contactTexture);
-      const floor = groundPlane(floorTexture, LOOK.floor.size, LOOK.floor.size, 0, RENDER_ORDER.floor);
+      disposables.push(softTexture, contactTexture);
       const soft = groundPlane(
         softTexture,
         size.x * LOOK.shadows.soft.widthScale,
@@ -318,8 +322,8 @@ export function createViewer(
         shadow.position.x = centre.x;
         shadow.position.z = centre.z;
       }
-      scene.add(floor, soft, contact);
-      for (const plane of [floor, soft, contact]) disposables.push(plane.geometry, plane.material);
+      scene.add(soft, contact);
+      for (const plane of [soft, contact]) disposables.push(plane.geometry, plane.material);
 
       startTarget.set(centre.x, box.min.y + size.y * 0.42 - FRAMING_LIFT, centre.z);
       for (const x of [box.min.x, box.max.x]) {
@@ -328,7 +332,7 @@ export function createViewer(
         }
       }
       camera.near = 0.2;
-      camera.far = 80;
+      camera.far = LOOK.environment.radius * 3;
       camera.updateProjectionMatrix();
       resetView();
 
@@ -369,6 +373,7 @@ export function createViewer(
       for (const item of disposables) item.dispose();
       vehicleMaterials?.dispose();
       environment?.dispose();
+      backgroundImage?.dispose();
       pmrem.dispose();
       renderer.dispose();
       renderer.domElement.remove();
