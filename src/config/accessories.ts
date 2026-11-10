@@ -6,6 +6,7 @@ export interface Accessory {
    * hidden together. Lookup is by name and may return a group, not only a mesh.
    */
   nodes: readonly string[];
+  behaviour?: "material";
   /** Whether the accessory is visible when the page first loads. */
   defaultVisible: boolean;
 }
@@ -19,5 +20,5 @@ export const ACCESSORIES: readonly Accessory[] = [
   { id: "roof-rails", label: "Roof rails", nodes: ["rail_01"], defaultVisible: true },
   { id: "side-steps", label: "Side steps", nodes: ["rubber_02"], defaultVisible: true },
   { id: "mud-flaps", label: "Mud flaps", nodes: ["rubber_01"], defaultVisible: true },
-  { id: "bed-liner", label: "Bed liner", nodes: ["trunk"], defaultVisible: true },
+  { id: "bed-liner", label: "Bed liner", nodes: ["trunk"], behaviour: "material", defaultVisible: true },
 ];

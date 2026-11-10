@@ -1,4 +1,5 @@
-import { Color, Mesh, MeshPhysicalMaterial, type Material, type Object3D } from "three";
+import { Color, DoubleSide, Mesh, MeshPhysicalMaterial, type Material, type Object3D } from "three";
+import { Transition } from "./motion.ts";
 
 /**
  * Material tuning for the vehicle. The exported model carries no usable paint
@@ -59,7 +60,9 @@ export const TUNED_MATERIAL_NAMES: readonly string[] = [
 ];
 
 export interface VehicleMaterials {
-  setPaintColour: (colour: string) => void;
+  setPaintColour: (colour: string, immediate?: boolean) => void;
+  setBedLiner: (enabled: boolean, immediate?: boolean) => void;
+  update: (now: number) => boolean;
   dispose: () => void;
 }
 
@@ -88,9 +91,10 @@ function toAlphaGlass(material: Material, opacity: number) {
  * shared material, so a colour change is a single assignment and leaves clearcoat,
  * roughness and everything else untouched.
  */
-export function applyVehicleMaterials(root: Object3D, paintColour: string): VehicleMaterials {
+export function applyVehicleMaterials(root: Object3D, paintColour: string, bedLiner = true): VehicleMaterials {
   const paint = new MeshPhysicalMaterial({
     name: PAINT.material,
+    side: DoubleSide,
     color: new Color(paintColour),
     metalness: PAINT.metalness,
     roughness: PAINT.roughness,
@@ -105,6 +109,13 @@ export function applyVehicleMaterials(root: Object3D, paintColour: string): Vehi
     roughness: ACCENT.roughness,
   });
   const replaced = new Set<Material>();
+  const paintFrom = paint.color.clone();
+  const paintTo = paint.color.clone();
+  const paintMotion = new Transition(1, 380);
+  const linerMotion = new Transition(bedLiner ? 1 : 0, 420);
+  const liner = paint.clone();
+  liner.name = "bed-liner-finish";
+  const rubberColour = new Color("#101214");
 
   eachMesh(root, (mesh, material) => {
     if (material.name === PAINT.material) {
@@ -129,12 +140,37 @@ export function applyVehicleMaterials(root: Object3D, paintColour: string): Vehi
   });
 
   for (const material of replaced) material.dispose();
+  root.getObjectByName("trunk")?.traverse(object => {
+    if ((object as Mesh).isMesh) (object as Mesh).material = liner;
+  });
+
+  const update = (now: number) => {
+    const active = paintMotion.update(now);
+    const linerActive = linerMotion.update(now);
+    paint.color.copy(paintFrom).lerp(paintTo, paintMotion.value);
+    liner.color.copy(paint.color).lerp(rubberColour, linerMotion.value);
+    liner.roughness = PAINT.roughness + (1 - PAINT.roughness) * linerMotion.value;
+    liner.metalness = PAINT.metalness * (1 - linerMotion.value);
+    liner.clearcoat = 1 - linerMotion.value;
+    liner.envMapIntensity = 1 - linerMotion.value;
+    return active || linerActive;
+  };
+  update(performance.now());
 
   return {
-    setPaintColour: (colour) => paint.color.set(colour),
+    setPaintColour: (colour, immediate = false) => {
+      update(performance.now());
+      paintFrom.copy(paint.color);
+      paintTo.set(colour);
+      paintMotion.to(0, performance.now(), true);
+      paintMotion.to(1, performance.now(), immediate);
+    },
+    setBedLiner: (enabled, immediate = false) => linerMotion.to(enabled ? 1 : 0, performance.now(), immediate),
+    update,
     dispose: () => {
       paint.dispose();
       accent.dispose();
+      liner.dispose();
     },
   };
 }

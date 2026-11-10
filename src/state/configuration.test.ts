@@ -46,13 +46,21 @@ test("setting an accessory to its current value or an unknown id returns the sam
 
 test("hidden nodes cover the whole group of every hidden accessory and nothing else", () => {
   let state = initialConfiguration();
-  assert.deepEqual(hiddenNodes(state), ACCESSORIES.filter((a) => !a.defaultVisible).flatMap((a) => a.nodes));
+  assert.deepEqual(hiddenNodes(state), ACCESSORIES.filter((a) => a.behaviour !== "material" && !a.defaultVisible).flatMap((a) => a.nodes));
   for (const accessory of ACCESSORIES) {
     state = configurationReducer(state, { type: "setAccessory", accessoryId: accessory.id, visible: false });
   }
-  assert.deepEqual(hiddenNodes(state), ACCESSORIES.flatMap((a) => a.nodes));
+  assert.deepEqual(hiddenNodes(state), ACCESSORIES.filter((a) => a.behaviour !== "material").flatMap((a) => a.nodes));
   for (const accessory of ACCESSORIES) {
     state = configurationReducer(state, { type: "setAccessory", accessoryId: accessory.id, visible: true });
   }
   assert.deepEqual(hiddenNodes(state), []);
+});
+
+test("removing the bed liner keeps the tray geometry visible through colour and accessory changes", () => {
+  let state = configurationReducer(initialConfiguration(), { type: "setAccessory", accessoryId: "bed-liner", visible: false });
+  state = configurationReducer(state, { type: "selectColour", colourId: "mineral-white" });
+  state = configurationReducer(state, { type: "setAccessory", accessoryId: "roof-rails", visible: false });
+  assert.equal(state.accessories["bed-liner"], false);
+  assert.deepEqual(hiddenNodes(state), ["rail_01"]);
 });

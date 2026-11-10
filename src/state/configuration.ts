@@ -34,5 +34,5 @@ export function configurationReducer(state: Configuration, action: Configuration
 
 /** Names of every model node that must be hidden for this configuration. */
 export function hiddenNodes(configuration: Configuration): string[] {
-  return ACCESSORIES.filter((a) => !configuration.accessories[a.id]).flatMap((a) => a.nodes);
+  return ACCESSORIES.filter((a) => a.behaviour !== "material" && !configuration.accessories[a.id]).flatMap((a) => a.nodes);
 }

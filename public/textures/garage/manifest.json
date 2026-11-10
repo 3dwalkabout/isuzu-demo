@@ -1,0 +1,190 @@
+{
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "verifiedOn": "2026-11-09",
+  "assets": [
+    {
+      "asset": "hangar_concrete_floor",
+      "authors": {
+        "Dimitrios Savva": "All"
+      },
+      "sourcePage": "https://polyhaven.com/a/hangar_concrete_floor",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/hangar_concrete_floor/hangar_concrete_floor_diff_2k.jpg",
+      "sourceMd5": "35e620ca791e0105e680ef775ecf719d",
+      "sourceBytes": 2559056,
+      "resolution": "2k",
+      "file": "hangar_concrete_floor_diff.webp",
+      "bytes": 444578,
+      "sha256": "02b4279bd73b05f718dc670a495ceaefd278f5320573eff5db789cc02486efb1"
+    },
+    {
+      "asset": "hangar_concrete_floor",
+      "authors": {
+        "Dimitrios Savva": "All"
+      },
+      "sourcePage": "https://polyhaven.com/a/hangar_concrete_floor",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/hangar_concrete_floor/hangar_concrete_floor_nor_gl_1k.jpg",
+      "sourceMd5": "28309c8eaf4dbf8647255d75a5bb8282",
+      "sourceBytes": 792876,
+      "resolution": "1k",
+      "file": "hangar_concrete_floor_nor_gl.webp",
+      "bytes": 144662,
+      "sha256": "a3a05b88ef29044942503c2922d2b42ef7d33ea11f1836a3872ab20f3370e116"
+    },
+    {
+      "asset": "hangar_concrete_floor",
+      "authors": {
+        "Dimitrios Savva": "All"
+      },
+      "sourcePage": "https://polyhaven.com/a/hangar_concrete_floor",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/hangar_concrete_floor/hangar_concrete_floor_rough_1k.jpg",
+      "sourceMd5": "785ce74ed3a3c00dead34424c5e23749",
+      "sourceBytes": 518102,
+      "resolution": "1k",
+      "file": "hangar_concrete_floor_rough.webp",
+      "bytes": 65616,
+      "sha256": "80b6a790be3de6440014b4573c20f75fc05d8c0b633668f104002c85c318caf5"
+    },
+    {
+      "asset": "concrete_wall_006",
+      "authors": {
+        "Dario Barresi": "Processing",
+        "Charlotte Baglioni": "Photography"
+      },
+      "sourcePage": "https://polyhaven.com/a/concrete_wall_006",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_wall_006/concrete_wall_006_diff_2k.jpg",
+      "sourceMd5": "604ffd4e767e1949d714ee9ee35215ca",
+      "sourceBytes": 3109558,
+      "resolution": "2k",
+      "file": "concrete_wall_006_diff.webp",
+      "bytes": 617624,
+      "sha256": "20e3cc8b5ac56b7383b0cab084f927e75f203e2843f3cafe337cbd6e86248547"
+    },
+    {
+      "asset": "concrete_wall_006",
+      "authors": {
+        "Dario Barresi": "Processing",
+        "Charlotte Baglioni": "Photography"
+      },
+      "sourcePage": "https://polyhaven.com/a/concrete_wall_006",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_006/concrete_wall_006_nor_gl_1k.jpg",
+      "sourceMd5": "337cf8d33598e1ecd036ef3727a4b36d",
+      "sourceBytes": 1195078,
+      "resolution": "1k",
+      "file": "concrete_wall_006_nor_gl.webp",
+      "bytes": 407502,
+      "sha256": "f62e9b5b377c36223d309ee9254f562d951fb8a41f2bb7e061de6506520aaefa"
+    },
+    {
+      "asset": "concrete_wall_006",
+      "authors": {
+        "Dario Barresi": "Processing",
+        "Charlotte Baglioni": "Photography"
+      },
+      "sourcePage": "https://polyhaven.com/a/concrete_wall_006",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_006/concrete_wall_006_rough_1k.jpg",
+      "sourceMd5": "660e38696f8c92d1585b17b7cc01cc06",
+      "sourceBytes": 255004,
+      "resolution": "1k",
+      "file": "concrete_wall_006_rough.webp",
+      "bytes": 3700,
+      "sha256": "3eabf683daca8741f2267fc432fe3221715c5cd0082434ec0707d2a12a26b1d9"
+    },
+    {
+      "asset": "painted_metal_shutter",
+      "authors": {
+        "Dario Barresi": "Baking",
+        "Rico Cilliers": "Processing ",
+        "Charlotte Baglioni": "Photography"
+      },
+      "sourcePage": "https://polyhaven.com/a/painted_metal_shutter",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/painted_metal_shutter/painted_metal_shutter_diff_2k.jpg",
+      "sourceMd5": "71f3093741ac82b1e4ab10fd25bc367d",
+      "sourceBytes": 2474114,
+      "resolution": "2k",
+      "outputResolution": "2k",
+      "file": "painted_metal_shutter_diff.webp",
+      "bytes": 409178,
+      "sha256": "81482b737badd45d286f69dccede0b3b8202372cc92256a8166c5a2679f879a5"
+    },
+    {
+      "asset": "painted_metal_shutter",
+      "authors": {
+        "Dario Barresi": "Baking",
+        "Rico Cilliers": "Processing ",
+        "Charlotte Baglioni": "Photography"
+      },
+      "sourcePage": "https://polyhaven.com/a/painted_metal_shutter",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_metal_shutter/painted_metal_shutter_nor_gl_1k.jpg",
+      "sourceMd5": "a18c51114f00627f9e48254e870ceb91",
+      "sourceBytes": 730726,
+      "resolution": "1k",
+      "outputResolution": "512px",
+      "file": "painted_metal_shutter_nor_gl.webp",
+      "bytes": 196662,
+      "sha256": "1a2328862971748e431349e28e458991c218ae362ffb6c272dec31ac0fb1962e"
+    },
+    {
+      "asset": "painted_metal_shutter",
+      "authors": {
+        "Dario Barresi": "Baking",
+        "Rico Cilliers": "Processing ",
+        "Charlotte Baglioni": "Photography"
+      },
+      "sourcePage": "https://polyhaven.com/a/painted_metal_shutter",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_metal_shutter/painted_metal_shutter_arm_1k.jpg",
+      "sourceMd5": "be0154e168d571f601cff127181d5ca0",
+      "sourceBytes": 606809,
+      "resolution": "1k",
+      "outputResolution": "512px",
+      "file": "painted_metal_shutter_arm.webp",
+      "bytes": 202524,
+      "sha256": "2abbd064669bb0aba46e939b1270abe727fe7eddf4e04ad2e57b40e8098d763a"
+    },
+    {
+      "asset": "blue_metal_plate",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "sourcePage": "https://polyhaven.com/a/blue_metal_plate",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/blue_metal_plate/blue_metal_plate_diff_1k.jpg",
+      "sourceMd5": "a906d0e554596fb76c6969f2f644c5e6",
+      "sourceBytes": 395923,
+      "resolution": "1k",
+      "outputResolution": "1k",
+      "file": "blue_metal_plate_diff.webp",
+      "bytes": 13002,
+      "sha256": "c9ff69f0d9187c85b430aa71a72973f9079bb710004d5698ae0164f4f0e3e788"
+    },
+    {
+      "asset": "blue_metal_plate",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "sourcePage": "https://polyhaven.com/a/blue_metal_plate",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/blue_metal_plate/blue_metal_plate_nor_gl_1k.jpg",
+      "sourceMd5": "f14c0f01832f8b18c39f07e4b5d6f749",
+      "sourceBytes": 238025,
+      "resolution": "1k",
+      "outputResolution": "512px",
+      "file": "blue_metal_plate_nor_gl.webp",
+      "bytes": 88738,
+      "sha256": "dc4718e06a86b95a56e41df7c2da63048164b45551df3b6d80e25e1a98c1e051"
+    },
+    {
+      "asset": "blue_metal_plate",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "sourcePage": "https://polyhaven.com/a/blue_metal_plate",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/blue_metal_plate/blue_metal_plate_arm_1k.jpg",
+      "sourceMd5": "7314bc335cd9bcc8a18841ad15e10985",
+      "sourceBytes": 419910,
+      "resolution": "1k",
+      "outputResolution": "512px",
+      "file": "blue_metal_plate_arm.webp",
+      "bytes": 181526,
+      "sha256": "2bf09415f81a256df02ebb4c21e6b5fb5b34b107f4cf8fb9ab360bb4cc0096e1"
+    }
+  ]
+}
