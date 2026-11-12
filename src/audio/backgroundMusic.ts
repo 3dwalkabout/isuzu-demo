@@ -36,7 +36,7 @@ export interface BackgroundMusic {
  * Looping background music that never starts by itself. The audio element is created on the
  * first toggle, so nothing is downloaded until a visitor asks for sound. Playback pauses while
  * the page is hidden and resumes when it returns, and a file that fails to load ends in the
- * `failed` state instead of throwing.
+ * `failed` state instead of throwing, and toggling again from there retries the load.
  */
 export function createBackgroundMusic(
   src: string,
@@ -54,12 +54,24 @@ export function createBackgroundMusic(
 
   const fail = () => setState("failed");
 
+  const release = () => {
+    if (!audio) return;
+    audio.removeEventListener("error", fail);
+    audio.pause();
+    audio.src = "";
+    audio = null;
+  };
+
   const start = () => {
     const element = audio;
     if (!element) return;
     element.play().catch((error: unknown) => {
-      // a refused or interrupted start is not a broken file, the visitor can try again
+      // a rejection from an element that was since replaced or released says nothing about the current one
+      if (element !== audio) return;
       const name = (error as { name?: string } | null)?.name;
+      // pausing for a hidden page rejects the pending start, the return from hidden resumes it
+      if (name === "AbortError" && visibility.hidden) return;
+      // a refused or interrupted start is not a broken file, the visitor can try again
       if (name === "NotAllowedError" || name === "AbortError") setState("paused");
       else fail();
     });
@@ -77,7 +89,9 @@ export function createBackgroundMusic(
       return state;
     },
     toggle() {
-      if (disposed || state === "failed") return;
+      if (disposed) return;
+      // a failed file is requested again from scratch, so a file that appears later can recover
+      if (state === "failed") release();
       if (state === "playing") {
         audio?.pause();
         setState("paused");
@@ -98,12 +112,7 @@ export function createBackgroundMusic(
       if (disposed) return;
       disposed = true;
       visibility.removeEventListener("visibilitychange", onVisibility);
-      if (audio) {
-        audio.removeEventListener("error", fail);
-        audio.pause();
-        audio.src = "";
-      }
-      audio = null;
+      release();
     },
   };
 }

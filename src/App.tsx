@@ -52,7 +52,11 @@ export function App() {
   const appRef = useRef<HTMLElement | null>(null);
   const fullscreen = useFullscreen(appRef);
   const music = useBackgroundMusic();
-  const soundLabel = !music.available ? "Sound — audio unavailable" : music.failed ? "Sound — audio failed to load" : "Sound";
+  const soundLabel = !music.available
+    ? "Sound — audio unavailable"
+    : music.failed
+      ? "Sound — audio failed to load, press to retry"
+      : music.playing ? "Sound on" : "Sound off";
   const colour = getPaintColour(configuration.colourId);
   const hidden = useMemo(() => hiddenNodes(configuration), [configuration.accessories]);
   const viewer = useViewer({
@@ -209,6 +213,12 @@ export function App() {
         </div>
       )}
 
+      {music.failed && (
+        <div className="capture-error surface" role="status">
+          <span>Background music could not be loaded. Press Sound to try again.</span>
+        </div>
+      )}
+
       <nav className="toolbar surface" aria-label="Configurator">
         <div className="toolbar-modes toolbar-group" role="group" aria-label="Mode">
           <button type="button" className="toolbar-action" aria-label="Configure" data-tooltip="Configure" disabled={!ready}
@@ -255,7 +265,7 @@ export function App() {
         <button type="button" className="toolbar-action" aria-label="Save photo" data-tooltip="Save photo" disabled={!ready} onClick={viewer.savePhoto}><Icon svg={cameraIcon} /></button>
         <button type="button" className="toolbar-action" aria-label={soundLabel} data-tooltip={soundLabel}
           aria-pressed={music.available && !music.failed ? music.playing : undefined}
-          disabled={!music.available || music.failed} onClick={music.toggle}><Icon svg={audioIcon} /></button>
+          disabled={!music.available} onClick={music.toggle}><Icon svg={audioIcon} /></button>
         <button ref={viewListButton} type="button" className="toolbar-action view-list-toggle" aria-label="Camera views" data-tooltip="View"
           aria-expanded={viewListOpen} aria-controls={viewListOpen ? "camera-views" : undefined} disabled={!ready}
           onClick={() => { setPanel(null); setViewListOpen(open => !open); }}>

@@ -114,15 +114,53 @@ test("a start refused by the browser leaves the control usable", async () => {
   assert.equal(music.state, "paused");
 });
 
-test("a file that fails to load ends in the failed state and ignores later toggles", async () => {
+test("a file that fails to load ends in the failed state", async () => {
   const { audio, music, states } = setup();
   music.toggle();
   await settle();
   audio.fireError();
   assert.equal(music.state, "failed");
-  music.toggle();
-  assert.equal(music.state, "failed");
   assert.deepEqual(states, ["playing", "failed"]);
+});
+
+test("toggling after a failure retries with a fresh audio element", async () => {
+  const created: ReturnType<typeof fakeAudio>[] = [];
+  const page = fakeVisibility();
+  const states: MusicState[] = [];
+  const music = createBackgroundMusic("track.mp3", {
+    volume: 0.5,
+    onChange: state => states.push(state),
+    createAudio: () => {
+      const next = fakeAudio();
+      created.push(next);
+      return next;
+    },
+    visibility: page,
+  });
+  music.toggle();
+  await settle();
+  created[0].fireError();
+  music.toggle();
+  await settle();
+  assert.equal(created.length, 2);
+  assert.equal(created[0].listenerCount(), 0);
+  assert.equal(created[0].src, "");
+  assert.equal(created[1].plays, 1);
+  assert.equal(music.state, "playing");
+  assert.deepEqual(states, ["playing", "failed", "playing"]);
+});
+
+test("a rejection from the pause for a hidden page does not stop the resume", async () => {
+  let rejectStart: (error: Error) => void = () => {};
+  const pending = () => new Promise<void>((_resolve, reject) => { rejectStart = reject; });
+  const { audio, page, music } = setup(pending);
+  music.toggle();
+  page.set(true);
+  rejectStart(Object.assign(new Error("interrupted"), { name: "AbortError" }));
+  await settle();
+  assert.equal(music.state, "playing");
+  page.set(false);
+  assert.equal(audio.plays, 2);
 });
 
 test("a playback error that is not a refusal also ends in the failed state", async () => {

@@ -4,7 +4,8 @@ import { BACKGROUND_TRACK, MUSIC_VOLUME } from "@/config/audio";
 
 /**
  * Sound state for the Sound control. `available` is false while no track is configured, so the
- * caller keeps the control disabled. Nothing is requested until `toggle` is called.
+ * caller keeps the control disabled. Nothing is requested until `toggle` is called, and toggling
+ * while `failed` retries the load.
  */
 export function useBackgroundMusic() {
   const [state, setState] = useState<MusicState>("idle");
