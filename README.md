@@ -35,6 +35,7 @@ Colours and accessories are data, edit them without touching other code:
 
 - `src/config/colours.ts` lists the body colours (`id`, `name`, `hex`) and the default. Names match the Australian D-MAX X-TERRAIN customiser checked on 9 November 2026; hex values remain display approximations. Colours change only the shared `carpaint` material; finish and clearcoat come from `src/viewer/materials.ts`.
 - `src/config/accessories.ts` lists each accessory (`id`, `label`, `nodes`, `defaultVisible`). `nodes` are model node names, all shown or hidden together. After `gltfpack` a name can match a wrapper group and its mesh, both are toggled
+- `src/config/audio.ts` sets the background track and its volume. The track is `null` until a licensed file is added under `public/audio/` with its source and licence recorded beside it. While it is `null` the Sound control stays disabled and no audio is requested. With a track set, playback starts only from the Sound control, loops at a low level, pauses while the page is hidden, and a file that fails to load disables the control with an explanation. `src/audio/backgroundMusic.ts` holds the controller.
 - `src/viewer/materials.ts` holds the tuned materials by name: `carpaint` (body), `carpaint_second` (grille accents), `tire` and the glass materials
 
 | Accessory | Model node |

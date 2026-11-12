@@ -4,6 +4,7 @@ import { Icon } from "@/components/Icon";
 import { Toggle } from "@/components/Toggle";
 import { CameraControls } from "@/components/CameraControls";
 import { useFullscreen } from "@/components/useFullscreen";
+import { useBackgroundMusic } from "@/components/useBackgroundMusic";
 import { ACCESSORIES } from "@/config/accessories";
 import { PAINT_COLOURS, getPaintColour } from "@/config/colours";
 import { closedDoors, DOORS, DOOR_IDS, type DoorState } from "@/config/doors";
@@ -50,6 +51,8 @@ export function App() {
   const lastSelector = useRef<HTMLButtonElement | null>(null);
   const appRef = useRef<HTMLElement | null>(null);
   const fullscreen = useFullscreen(appRef);
+  const music = useBackgroundMusic();
+  const soundLabel = !music.available ? "Sound — audio unavailable" : music.failed ? "Sound — audio failed to load" : "Sound";
   const colour = getPaintColour(configuration.colourId);
   const hidden = useMemo(() => hiddenNodes(configuration), [configuration.accessories]);
   const viewer = useViewer({
@@ -250,7 +253,9 @@ export function App() {
           <Icon svg={reflectionsIcon} />
         </button>
         <button type="button" className="toolbar-action" aria-label="Save photo" data-tooltip="Save photo" disabled={!ready} onClick={viewer.savePhoto}><Icon svg={cameraIcon} /></button>
-        <button type="button" className="toolbar-action" aria-label="Sound — audio unavailable" data-tooltip="Sound — audio unavailable" disabled><Icon svg={audioIcon} /></button>
+        <button type="button" className="toolbar-action" aria-label={soundLabel} data-tooltip={soundLabel}
+          aria-pressed={music.available && !music.failed ? music.playing : undefined}
+          disabled={!music.available || music.failed} onClick={music.toggle}><Icon svg={audioIcon} /></button>
         <button ref={viewListButton} type="button" className="toolbar-action view-list-toggle" aria-label="Camera views" data-tooltip="View"
           aria-expanded={viewListOpen} aria-controls={viewListOpen ? "camera-views" : undefined} disabled={!ready}
           onClick={() => { setPanel(null); setViewListOpen(open => !open); }}>
