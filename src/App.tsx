@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Check, RotateCcw, X } from "lucide-react";
+import { Check, Maximize, Minimize, RotateCcw, X } from "lucide-react";
 import { Icon } from "@/components/Icon";
 import { Toggle } from "@/components/Toggle";
 import { CameraControls } from "@/components/CameraControls";
+import { useFullscreen } from "@/components/useFullscreen";
 import { ACCESSORIES } from "@/config/accessories";
 import { PAINT_COLOURS, getPaintColour } from "@/config/colours";
 import { closedDoors, DOORS, DOOR_IDS, type DoorState } from "@/config/doors";
@@ -47,6 +48,8 @@ export function App() {
   const [doors, setDoors] = useState(closedDoors);
   const [configuration, dispatch] = useReducer(configurationReducer, undefined, initialConfiguration);
   const lastSelector = useRef<HTMLButtonElement | null>(null);
+  const appRef = useRef<HTMLElement | null>(null);
+  const fullscreen = useFullscreen(appRef);
   const colour = getPaintColour(configuration.colourId);
   const hidden = useMemo(() => hiddenNodes(configuration), [configuration.accessories]);
   const viewer = useViewer({
@@ -84,7 +87,7 @@ export function App() {
   };
 
   return (
-    <main className="app">
+    <main className="app" ref={appRef}>
       <div className="viewer" ref={viewer.containerRef} />
       <h1 className="vehicle-name">ISUZU D-MAX</h1>
       {ready && <CameraControls />}
@@ -253,6 +256,15 @@ export function App() {
           onClick={() => { setPanel(null); setViewListOpen(open => !open); }}>
           <Icon svg={videoIcon} />
         </button>
+        {fullscreen.supported && (
+          <button type="button" className="toolbar-action" aria-label={fullscreen.active ? "Exit fullscreen" : "Enter fullscreen"}
+            data-tooltip={fullscreen.active ? "Exit fullscreen" : "Fullscreen"} aria-pressed={fullscreen.active}
+            onClick={fullscreen.toggle}>
+            {fullscreen.active
+              ? <Minimize size={20} strokeWidth={1.4} aria-hidden="true" />
+              : <Maximize size={20} strokeWidth={1.4} aria-hidden="true" />}
+          </button>
+        )}
         <button type="button" className="toolbar-action reset-camera" aria-label="Reset camera" data-tooltip="Reset camera"
           disabled={!ready} onClick={viewer.resetView}><RotateCcw size={20} strokeWidth={1.4} aria-hidden="true" /></button>
         </div>
