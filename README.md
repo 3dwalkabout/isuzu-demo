@@ -48,7 +48,9 @@ The bed liner changes only its own material. With the liner off, the tray follow
 
 ## Motion and interface
 
-The toolbar keeps the original ticket SVGs: Configure and Present on the left; Paint, Wheels, Accessories, Trim and Interior in the centre; Reflections, Photo, Sound and View on the right, followed by a separate Reset camera button. The arrow bouncing off a surface is Reflections. On phones the toolbar uses two rows. The View icon, including its upward chevron, opens Front, Back, Side, Top and Driver views. Lucide supplies supporting close, check and reset icons. Escape or Close dismisses a panel and returns focus to its selector.
+The toolbar keeps the original ticket SVGs: Configure and Present on the left; Paint, Wheels, Accessories, Trim and Interior in the centre; Reflections, Photo, Sound and View on the right, followed by Fullscreen and a separate Reset camera button. The arrow bouncing off a surface is Reflections. On phones the toolbar uses two rows. The View icon, including its upward chevron, opens Front, Front 3/4, Side, Rear 3/4, Back, Top and Driver views, defined in `src/config/views.ts`.
+
+Fullscreen (`src/components/useFullscreen.ts`) expands the whole app, so the toolbar and panels stay available, and the button follows the browser's fullscreen state, including exit with Escape. Browsers without the Fullscreen API, such as iPhone Safari, do not show the button and keep the normal layout. Configuration and camera are unchanged on enter and exit. Lucide supplies supporting close, check and reset icons. Escape or Close dismisses a panel and returns focus to its selector.
 
 The upper-right camera guide shows left-button drag and wheel scrolling on desktop, and one-finger drag and two-finger pinch on phones or coarse pointers. It does not intercept gestures over the scene.
 
