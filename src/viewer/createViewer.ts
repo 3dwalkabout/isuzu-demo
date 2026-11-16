@@ -31,8 +31,9 @@ import { createStudio } from "./studio";
 import { loadStudioTextures } from "./studioTextures";
 import { saveCapture } from "./capture";
 import { VIEWS, type ViewId } from "../config/views";
+import { DEFAULT_MODEL } from "../config/models";
 
-const MODEL_URL = `${import.meta.env.BASE_URL}models/dmax.glb`;
+const MODEL_URL = `${import.meta.env.BASE_URL}${DEFAULT_MODEL.file}`;
 const HDRI_URL = `${import.meta.env.BASE_URL}hdri/${LOOK.environment.file}`;
 const withBust = (url: string, bust?: string) => (bust ? `${url}?r=${encodeURIComponent(bust)}` : url);
 const MAX_PIXEL_RATIO = 2;

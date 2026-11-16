@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { ACCESSORIES } from "./accessories.ts";
+import { DEFAULT_MODEL } from "./models.ts";
 import { TUNED_MATERIAL_NAMES } from "../viewer/materials.ts";
 import { DEFAULT_COLOUR_ID, PAINT_COLOURS, getPaintColour } from "./colours.ts";
 
@@ -12,7 +13,7 @@ interface GltfJson {
 
 /** Reads the JSON chunk of the shipped binary glTF. */
 function readModelJson(): GltfJson {
-  const file = readFileSync(new URL("../../public/models/dmax.glb", import.meta.url));
+  const file = readFileSync(new URL(`../../public/${DEFAULT_MODEL.file}`, import.meta.url));
   assert.equal(file.readUInt32LE(0), 0x46546c67, "not a glb file");
   const length = file.readUInt32LE(12);
   assert.equal(file.readUInt32LE(16), 0x4e4f534a, "first chunk is not JSON");
