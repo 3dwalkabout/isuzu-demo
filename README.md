@@ -25,9 +25,9 @@ npm ci
 npm run build -- --base=./
 ```
 
-In cPanel File Manager, open the target domain's document root (often `public_html`) and create a dedicated folder for the demo, such as `car-configurator`. Upload the contents of `dist/` directly into that folder: `index.html`, `assets/`, `models/`, `hdri/` and `textures/`. Preserve the folder structure. Do not upload the source project or `node_modules`.
+In cPanel File Manager, open the target domain's document root (often `public_html`) and create a dedicated folder for the demo, such as `car-configurator`. Upload the contents of `dist/` directly into that folder: `index.html`, `assets/`, `models/`, `hdri/`, `textures/` and, once a music track is added, `audio/`. Preserve the folder structure. Do not upload the source project or `node_modules`.
 
-Open `https://your-domain/car-configurator/` and check the vehicle, colours, accessories and doors. The page title and description are defined in the source `index.html`; rebuild and upload after changing them. HTTPS and ordinary static-file hosting are sufficient; no Node server is needed in cPanel.
+Open `https://your-domain/car-configurator/` and check the vehicle, colours, accessories and doors. The page title and description are defined in the source `index.html`; rebuild and upload after changing them. HTTPS and ordinary static-file hosting are sufficient; no Node server is needed in cPanel. The music file is a plain static file that loads only after a visitor presses Sound, and ordinary hosting serves `.mp3` or `.ogg` with the right type and caching, so no extra server settings are needed.
 
 ## Configuration
 
@@ -58,7 +58,7 @@ The upper-right camera guide shows left-button drag and wheel scrolling on deskt
 
 Reflections fades environment specular and clearcoat radiance over 300 ms. It preserves diffuse illumination, direct-light highlights, paint properties and shadows. A shared shader uniform updates existing materials without recreating the scene, recompiling on each toggle or refreshing shadow maps. Reduced motion applies the choice immediately; the toggle state survives camera resets and asset retries. `reflections.test.ts` covers reversal, shared materials and lighting preservation.
 
-Present slowly orbits the current build. A camera gesture, configuration selector or Reset stops presentation. Reduced-motion preferences disable automatic rotation. Accessories holds the fitted parts; Trim holds the bed liner finish; Interior holds the four animated door controls. Wheels and Sound are disabled, with accessible names and tooltips explaining why: the supplied asset has one wheel design and no audio. Add genuine model/audio assets before enabling them.
+Present slowly orbits the current build. A camera gesture, configuration selector or Reset stops presentation. Reduced-motion preferences disable automatic rotation. Accessories holds the fitted parts; Trim holds the bed liner finish; Interior holds the four animated door controls. Wheels is disabled, with an accessible name and tooltip explaining why: the supplied asset has one wheel design. Sound stays disabled with an explanation until a licensed track is configured, see `src/config/audio.ts`.
 
 Photo downloads a PNG of the scene without the interface. View presets animate the camera and lens, retain the configuration, support reduced motion and can be interrupted by a gesture. Driver uses a calibrated right-hand-drive eye position with a tiny orbit radius for looking around inside the cabin. Exterior presets restore zoom and above-ground orbit limits. The roof cuts away for Top. Tooltips use the same charcoal surfaces and appear on hover or keyboard focus; expanded controls suppress them.
 
