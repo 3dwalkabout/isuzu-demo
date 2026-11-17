@@ -35,14 +35,16 @@ function splitSides(mesh: Mesh) {
   return outputs;
 }
 
-export function createAccessoryMotion(model: Object3D) {
+/** `nodesById` lists the model nodes of each accessory the model offers, as in `models.ts`. */
+export function createAccessoryMotion(model: Object3D, nodesById: Readonly<Record<string, readonly string[]>>) {
   model.updateWorldMatrix(true,true);
   const root = new Group(); root.name = "animated-accessories";
-  const items = ACCESSORIES.filter(accessory => accessory.behaviour !== "material").map(accessory => {
+  const items = ACCESSORIES.filter(accessory => accessory.behaviour !== "material" && accessory.id in nodesById).map(accessory => {
+    const nodes = nodesById[accessory.id];
     const motion = new Transition(1, 850);
     const parts: {mesh: Mesh; offset: Vector3; materials: {material: Material; opacity: number; transparent: boolean; depthWrite: boolean}[]}[] = [];
     const seen = new Set<Mesh>();
-    for (const name of accessory.nodes) model.getObjectByName(name)?.traverse(object => {
+    for (const name of nodes) model.getObjectByName(name)?.traverse(object => {
       const source = object as Mesh;
       if (!source.isMesh || seen.has(source)) return;
       seen.add(source);
@@ -62,12 +64,12 @@ export function createAccessoryMotion(model: Object3D) {
       }
       source.visible = false;
     });
-    return {accessory,motion,parts};
+    return {nodes,motion,parts};
   });
   return {
     root,
     setHidden(names: readonly string[], now: number, immediate: boolean) {
-      for (const {accessory,motion} of items) motion.to(accessory.nodes.some(name => names.includes(name)) ? 0 : 1, now, immediate);
+      for (const {nodes,motion} of items) motion.to(nodes.some(name => names.includes(name)) ? 0 : 1, now, immediate);
     },
     update(now: number) {
       let active = false;

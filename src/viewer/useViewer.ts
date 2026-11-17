@@ -2,22 +2,35 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createViewer, type Viewer, type ViewerOptions } from "./createViewer";
 import type { ViewId } from "../config/views";
 
-type Selection = Pick<ViewerOptions, "paintColour" | "bedLiner" | "hiddenNodes" | "doors" | "reflections">;
+type Selection = Pick<ViewerOptions, "model" | "paintColour" | "bedLiner" | "hiddenNodes" | "doors" | "reflections">;
 type Status = "loading" | "ready" | "failed" | "unsupported" | "lost";
 
 /** The only React boundary for the imperative Three.js viewer. */
-export function useViewer({ paintColour, bedLiner, hiddenNodes, doors, reflections }: Selection) {
+export function useViewer({ model, paintColour, bedLiner, hiddenNodes, doors, reflections }: Selection) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
-  const selectionRef = useRef({ paintColour, bedLiner, hiddenNodes, doors, reflections });
+  const selectionRef = useRef({ model, paintColour, bedLiner, hiddenNodes, doors, reflections });
+  const shownModel = useRef(model);
   const [status, setStatus] = useState<Status>("loading");
   const [progress, setProgress] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [presenting, setPresentingState] = useState(false);
   const [captureError, setCaptureError] = useState(false);
 
+  // Declared before the selection effect on purpose. A new model is set first, so the colour,
+  // accessories and doors that arrive with it are kept for the new vehicle and never applied to
+  // the one being replaced. The scene itself is not recreated.
   useEffect(() => {
-    selectionRef.current = { paintColour, bedLiner, hiddenNodes, doors, reflections };
+    const viewer = viewerRef.current;
+    if (!viewer || shownModel.current === model) return;
+    shownModel.current = model;
+    setStatus("loading");
+    setProgress(0);
+    viewer.setModel(model);
+  }, [model]);
+
+  useEffect(() => {
+    selectionRef.current = { model, paintColour, bedLiner, hiddenNodes, doors, reflections };
     const viewer = viewerRef.current;
     if (!viewer) return;
     viewer.setPaintColour(paintColour);
@@ -25,7 +38,7 @@ export function useViewer({ paintColour, bedLiner, hiddenNodes, doors, reflectio
     viewer.setHiddenNodes(hiddenNodes);
     viewer.setDoors(doors);
     viewer.setReflections(reflections);
-  }, [paintColour, bedLiner, hiddenNodes, doors, reflections]);
+  }, [model, paintColour, bedLiner, hiddenNodes, doors, reflections]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -33,6 +46,7 @@ export function useViewer({ paintColour, bedLiner, hiddenNodes, doors, reflectio
     setStatus("loading");
     setProgress(0);
     setPresentingState(false);
+    shownModel.current = selectionRef.current.model;
 
     try {
       const viewer = createViewer(container, {

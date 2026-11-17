@@ -21,7 +21,6 @@ function readModelJson(): GltfJson {
 }
 
 const model = readModelJson();
-const nodeNames = new Set(model.nodes.map((n) => n.name));
 const materialNames = new Set(model.materials.map((m) => m.name));
 
 test("colour ids are unique and the default exists", () => {
@@ -48,29 +47,10 @@ test("colour lookup returns the colour and rejects an unknown id", () => {
   assert.throws(() => getPaintColour("no-such-colour"));
 });
 
-test("accessory ids are unique and each has a label and nodes", () => {
+test("accessory ids are unique and each has a label", () => {
   const ids = ACCESSORIES.map((a) => a.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const accessory of ACCESSORIES) {
     assert.ok(accessory.label.trim().length > 0, `${accessory.id} has no label`);
-    assert.ok(accessory.nodes.length > 0, `${accessory.id} has no nodes`);
-  }
-});
-
-test("every accessory node resolves in the shipped model", () => {
-  for (const accessory of ACCESSORIES) {
-    for (const node of accessory.nodes) {
-      assert.ok(nodeNames.has(node), `${accessory.id}: node "${node}" is not in the model`);
-    }
-  }
-});
-
-test("no node belongs to more than one accessory", () => {
-  const owner = new Map<string, string>();
-  for (const accessory of ACCESSORIES) {
-    for (const node of accessory.nodes) {
-      assert.equal(owner.get(node), undefined, `"${node}" is in ${owner.get(node)} and ${accessory.id}`);
-      owner.set(node, accessory.id);
-    }
   }
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Box3, BoxGeometry, BufferAttribute, Group, Mesh, MeshPhysicalMaterial } from "three";
 import { createAccessoryMotion } from "./accessoryMotion.ts";
+import { DEFAULT_MODEL } from "../config/models.ts";
 
 test("paired accessories fit from opposite sides and reverse without jumping", () => {
   const model = new Group();
@@ -16,7 +17,7 @@ test("paired accessories fit from opposite sides and reverse without jumping", (
   }
   model.updateWorldMatrix(true,true);
   const original = new Box3().setFromObject(model);
-  const accessories = createAccessoryMotion(model);
+  const accessories = createAccessoryMotion(model, DEFAULT_MODEL.accessories);
   const names = ["rail_01","rubber_02","rubber_01"];
   accessories.setHidden(names,0,true); accessories.update(0);
   assert.equal(accessories.root.children.length,6);

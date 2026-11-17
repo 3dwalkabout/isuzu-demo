@@ -42,6 +42,10 @@ button:disabled { opacity: .4; cursor: default; }
 .camera-controls-touch { display: none; }
 .camera-gesture { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
 .gesture-accent { stroke: var(--accent); }
+.model-picker { position: absolute; top: 52px; left: 24px; display: flex; flex-wrap: wrap; gap: 2px; max-width: calc(100% - 48px); padding: 4px; border-radius: 12px; }
+.model-picker button { min-height: 36px; padding: 6px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; }
+.model-picker button:hover { color: var(--text); background: #ffffff0a; }
+.model-picker button[aria-pressed="true"] { color: var(--accent); background: #8de8eb0d; }
 
 .surface {
   border: 1px solid var(--border);
@@ -236,6 +240,7 @@ button[data-tooltip][aria-expanded="true"]::after { display: none; }
 }
 @media (max-width: 540px) {
   .vehicle-name { top: 20px; left: 20px; }
+  .model-picker { top: 48px; left: 12px; max-width: calc(100% - 24px); }
   .camera-controls { top: 12px; right: 16px; padding: 7px 9px; }
   .toolbar { width: calc(100% - 24px); }
   .toolbar-selectors { justify-content: space-between; gap: 0; }

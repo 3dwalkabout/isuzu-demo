@@ -5,7 +5,8 @@ import { Transition } from "./motion.ts";
 export function createReflections(enabled = true) {
   const strength = { value: enabled ? 1 : 0 };
   const motion = new Transition(strength.value, 300);
-  const attached = new Set<MeshStandardMaterial>();
+  // weak, so materials of a vehicle that was swapped out can be collected
+  const attached = new WeakSet<MeshStandardMaterial>();
   return {
     attach(root: Object3D) {
       root.traverse(object => {

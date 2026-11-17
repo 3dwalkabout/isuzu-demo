@@ -11,7 +11,6 @@ import {
   Scene,
   Vector3,
   WebGLRenderer,
-  type Material,
   type Object3D,
   type Texture,
 } from "three";
@@ -31,17 +30,14 @@ import { createStudio } from "./studio";
 import { loadStudioTextures } from "./studioTextures";
 import { saveCapture } from "./capture";
 import { VIEWS, type ViewId } from "../config/views";
-import { DEFAULT_MODEL } from "../config/models";
+import type { VehicleModel } from "../config/models";
+import { disposeObject } from "./dispose";
 
-const MODEL_URL = `${import.meta.env.BASE_URL}${DEFAULT_MODEL.file}`;
+const modelUrl = (model: VehicleModel) => `${import.meta.env.BASE_URL}${model.file}`;
 const HDRI_URL = `${import.meta.env.BASE_URL}hdri/${LOOK.environment.file}`;
 const withBust = (url: string, bust?: string) => (bust ? `${url}?r=${encodeURIComponent(bust)}` : url);
 const MAX_PIXEL_RATIO = 2;
 
-const START_AZIMUTH = MathUtils.degToRad(38);
-const START_ELEVATION = MathUtils.degToRad(11);
-const MIN_DISTANCE = 4.5;
-const MAX_DISTANCE = 14;
 const MAX_POLAR_ANGLE = MathUtils.degToRad(87);
 /** Share of the window the vehicle may fill along its limiting axis. */
 const FRAMING_FILL = 0.95;
@@ -53,6 +49,12 @@ export interface Viewer {
   setPresenting: (enabled: boolean) => void;
   savePhoto: () => Promise<void>;
   setView: (view: ViewId) => void;
+  /**
+   * Shows another vehicle in the same scene. The current vehicle stays until the new one has
+   * loaded, then is released, and a request superseded by a later one is discarded. Progress and
+   * completion arrive through `onProgress` and `onLoaded`.
+   */
+  setModel: (model: VehicleModel) => void;
   setReflections: (enabled: boolean) => void;
   setPaintColour: (colour: string) => void;
   setBedLiner: (enabled: boolean) => void;
@@ -63,6 +65,8 @@ export interface Viewer {
 }
 
 export interface ViewerOptions {
+  /** Vehicle shown first. */
+  model: VehicleModel;
   /** Body colour used when the model first appears. */
   paintColour: string;
   bedLiner: boolean;
@@ -80,27 +84,20 @@ export interface ViewerOptions {
   onPresentingChange?: (enabled: boolean) => void;
 }
 
-const TEXTURE_SLOTS = ["map", "normalMap", "roughnessMap", "metalnessMap", "emissiveMap", "aoMap"] as const;
-
-/** Releases the geometries, materials and textures under an object. */
-function disposeObject(root: Object3D) {
-  root.traverse((object) => {
-    const mesh = object as Mesh;
-    if (!mesh.isMesh) return;
-    mesh.geometry.dispose();
-    const materials: Material[] = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of materials) {
-      for (const slot of TEXTURE_SLOTS) {
-        (material as unknown as Record<string, Texture | null | undefined>)[slot]?.dispose();
-      }
-      material.dispose();
-    }
-  });
+/** Everything that belongs to the vehicle on show, released together when it is swapped out. */
+interface Vehicle {
+  spec: VehicleModel;
+  model: Object3D;
+  materials: VehicleMaterials;
+  doors: ReturnType<typeof createDoors> | null;
+  accessories: ReturnType<typeof createAccessoryMotion>;
+  studio: ReturnType<typeof createStudio>;
 }
 
 export function createViewer(
   container: HTMLElement,
   {
+    model: initialModel,
     paintColour: initialPaintColour,
     bedLiner: initialBedLiner,
     doors: initialDoors,
@@ -141,8 +138,8 @@ export function createViewer(
   controls.dampingFactor = 0.1;
   controls.rotateSpeed = 0.55;
   controls.zoomSpeed = 0.55;
-  controls.minDistance = MIN_DISTANCE;
-  controls.maxDistance = MAX_DISTANCE;
+  controls.minDistance = initialModel.camera.minDistance;
+  controls.maxDistance = initialModel.camera.maxDistance;
   controls.maxPolarAngle = MAX_POLAR_ANGLE;
   controls.autoRotateSpeed = 0.5;
 
@@ -169,7 +166,7 @@ export function createViewer(
       controls.autoRotate = presenting && !reducedMotion() && !cameraMotion.isResetting;
       const orbitActive = cameraMotion.isResetting ? false : controls.update(delta);
       const cameraActive = cameraMotion.update(now, reducedMotion());
-      studio?.updateCamera(camera.position.y);
+      vehicle?.studio.updateCamera(camera.position.y);
       const objectActive = updateMotion(now);
       const active = objectActive || orbitActive || cameraActive || controls.autoRotate;
       renderer.render(scene, camera);
@@ -231,7 +228,7 @@ export function createViewer(
   resize();
 
   let disposed = false;
-  let model: Object3D | null = null;
+  // the first load waits for the environment map, the vehicle and the garage textures
   let pending = 3;
   const assetLoaded = () => {
     pending -= 1;
@@ -240,10 +237,11 @@ export function createViewer(
   let environment: Texture | null = null;
   const disposables: { dispose: () => void }[] = [];
   const startTarget = new Vector3();
-  let vehicleMaterials: VehicleMaterials | null = null;
-  let animatedDoors: ReturnType<typeof createDoors> | null = null;
-  let animatedAccessories: ReturnType<typeof createAccessoryMotion> | null = null;
-  let studio: ReturnType<typeof createStudio> | null = null;
+  /** The vehicle on show, and the model the viewer is showing or about to show. */
+  let vehicle: Vehicle | null = null;
+  let spec = initialModel;
+  let loadToken = 0;
+  const cameraLimits = () => (vehicle?.spec ?? spec).camera;
   let doorState = initialDoors;
   let bedLiner = initialBedLiner;
   const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -251,10 +249,10 @@ export function createViewer(
   let hiddenNodes = initialHiddenNodes;
 
   updateMotion = (now) => {
-    let active = vehicleMaterials?.update(now) ?? false;
+    let active = vehicle?.materials.update(now) ?? false;
     active = reflections.update(now) || active;
-    const doorsActive = animatedDoors?.update(now) ?? false;
-    const accessoriesActive = animatedAccessories?.update(now) ?? false;
+    const doorsActive = vehicle?.doors?.update(now) ?? false;
+    const accessoriesActive = vehicle?.accessories.update(now) ?? false;
     if (doorsActive || accessoriesActive) renderer.shadowMap.needsUpdate = true;
     return active || doorsActive || accessoriesActive;
   };
@@ -272,7 +270,7 @@ export function createViewer(
       const depth = offset.dot(direction);
       distance = Math.max(distance, depth + Math.abs(offset.dot(right)) / tanH, depth + Math.abs(offset.dot(up)) / tanV);
     }
-    return Math.max(distance, MIN_DISTANCE);
+    return Math.max(distance, cameraLimits().minDistance);
   };
 
   const flushOrbit = () => {
@@ -283,8 +281,8 @@ export function createViewer(
 
   const configureCamera = (driver: boolean) => {
     driverView = driver;
-    controls.minDistance = driver ? 0.001 : MIN_DISTANCE;
-    controls.maxDistance = driver ? 0.001 : MAX_DISTANCE;
+    controls.minDistance = driver ? 0.001 : cameraLimits().minDistance;
+    controls.maxDistance = driver ? 0.001 : cameraLimits().maxDistance;
     controls.minPolarAngle = driver ? 0.05 : 0;
     controls.maxPolarAngle = driver ? Math.PI - 0.05 : MAX_POLAR_ANGLE;
     controls.enableZoom = !driver;
@@ -302,15 +300,17 @@ export function createViewer(
   };
 
   const setView = (id: ViewId, immediate = false) => {
+    // a model without a driver view ignores that request
+    if (id === "driver" && !cameraLimits().driverEye) return;
     setPresenting(false);
     flushOrbit();
     configureCamera(id === "driver");
     activeView = id;
     userMoved = true;
     if (id === "driver") {
-      // Calibrated right-hand-drive eye position. A millimetre orbit radius
+      // Calibrated eye position per model. A millimetre orbit radius
       // allows looking around without moving away from the driver's seat.
-      const eye = new Vector3(-0.4, 1.43, 0.25);
+      const eye = new Vector3(...cameraLimits().driverEye!);
       moveCamera(eye.clone().add(new Vector3(0, 0, -0.001)), eye, immediate);
     } else {
       const view = VIEWS.find(view => view.id === id)!;
@@ -318,7 +318,7 @@ export function createViewer(
       const azimuth = MathUtils.degToRad(view.azimuth), elevation = MathUtils.degToRad(view.elevation);
       const direction = new Vector3(Math.sin(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.cos(azimuth) * Math.cos(elevation));
       const distance = fitDistance(direction, inputCamera.fov) * (id === "top" ? 1.15 : 1);
-      controls.maxDistance = Math.max(MAX_DISTANCE, distance);
+      controls.maxDistance = Math.max(cameraLimits().maxDistance, distance);
       moveCamera(startTarget.clone().addScaledVector(direction, distance), startTarget, immediate);
     }
   };
@@ -327,14 +327,16 @@ export function createViewer(
     flushOrbit();
     configureCamera(false);
     activeView = null;
-    const horizontal = Math.cos(START_ELEVATION);
+    const startAzimuth = MathUtils.degToRad(cameraLimits().startAzimuth);
+    const startElevation = MathUtils.degToRad(cameraLimits().startElevation);
+    const horizontal = Math.cos(startElevation);
     const direction = new Vector3(
-      Math.sin(START_AZIMUTH) * horizontal,
-      Math.sin(START_ELEVATION),
-      Math.cos(START_AZIMUTH) * horizontal,
+      Math.sin(startAzimuth) * horizontal,
+      Math.sin(startElevation),
+      Math.cos(startAzimuth) * horizontal,
     );
     const distance = fitDistance(direction, inputCamera.fov);
-    controls.maxDistance = Math.max(MAX_DISTANCE, distance);
+    controls.maxDistance = Math.max(cameraLimits().maxDistance, distance);
     const position = startTarget.clone().addScaledVector(direction, distance);
     moveCamera(position, startTarget, immediate);
     userMoved = false;
@@ -353,7 +355,7 @@ export function createViewer(
       texture.dispose();
       environment = target.texture;
       scene.environment = environment;
-      studio?.setEnvironment(environment);
+      vehicle?.studio.setEnvironment(environment);
       disposables.push(target);
       requestRender();
       assetLoaded();
@@ -364,59 +366,96 @@ export function createViewer(
     },
   );
 
+  /** Releases the vehicle on show and everything built for it. */
+  const unloadVehicle = () => {
+    if (!vehicle) return;
+    const { model, materials, doors, accessories, studio } = vehicle;
+    vehicle = null;
+    doors?.dispose();
+    accessories.dispose();
+    materials.dispose();
+    studio.dispose();
+    model.removeFromParent();
+    disposeObject(model);
+    corners.length = 0;
+  };
+
+  const buildVehicle = (target: VehicleModel, model: Object3D, token: number) => {
+    const materials = applyVehicleMaterials(model, paintColour, bedLiner, {
+      paint: target.materials.paint,
+      accent: target.materials.accent,
+      linerNodes: target.accessories["bed-liner"] ?? [],
+    });
+    scene.add(model);
+
+    const box = new Box3().setFromObject(model);
+    const centre = box.getCenter(new Vector3());
+    const size = box.getSize(new Vector3());
+    const accessories = createAccessoryMotion(model, target.accessories);
+    scene.add(accessories.root);
+    accessories.setHidden(hiddenNodes, performance.now(), true);
+    const doors = target.doors ? createDoors(model) : null;
+    if (doors) {
+      scene.add(doors.root);
+      doors.set(doorState, performance.now(), true);
+    }
+    for (const root of [model, accessories.root, ...(doors ? [doors.root] : [])]) root.traverse(object => {
+      const mesh = object as Mesh;
+      if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+    });
+    const studio = createStudio(scene, box.min.y);
+    if (environment) studio.setEnvironment(environment);
+    reflections.attach(scene);
+    vehicle = { spec: target, model, materials, doors, accessories, studio };
+    void loadStudioTextures(import.meta.env.BASE_URL, Math.min(8, renderer.capabilities.getMaxAnisotropy())).then(textures => {
+      // the vehicle was swapped out or the viewer closed while the textures were loading
+      if (disposed || vehicle?.studio !== studio) { textures.dispose(); return; }
+      studio.setTextures(textures);
+      requestRender();
+      if (token === loadToken) assetLoaded();
+    });
+    renderer.shadowMap.needsUpdate = true;
+
+    startTarget.set(centre.x, box.min.y + size.y * 0.42 - FRAMING_LIFT, centre.z);
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) corners.push(new Vector3(x, y, z));
+      }
+    }
+    resetView(true);
+    requestRender();
+  };
+
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load(
-    withBust(MODEL_URL, cacheBust),
-    (gltf) => {
-      if (disposed) return;
-      model = gltf.scene;
-      vehicleMaterials = applyVehicleMaterials(gltf.scene, paintColour, bedLiner);
-      scene.add(gltf.scene);
-
-      const box = new Box3().setFromObject(gltf.scene);
-      const centre = box.getCenter(new Vector3());
-      const size = box.getSize(new Vector3());
-      animatedAccessories = createAccessoryMotion(gltf.scene);
-      scene.add(animatedAccessories.root);
-      animatedAccessories.setHidden(hiddenNodes, performance.now(), true);
-      animatedDoors = createDoors(gltf.scene);
-      scene.add(animatedDoors.root);
-      animatedDoors.set(doorState, performance.now(), true);
-      for (const root of [model, animatedDoors.root, animatedAccessories.root]) root.traverse(object => {
-        const mesh = object as Mesh;
-        if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
-      });
-      studio = createStudio(scene, box.min.y);
-      if (environment) studio.setEnvironment(environment);
-      reflections.attach(scene);
-      disposables.push(studio);
-      void loadStudioTextures(import.meta.env.BASE_URL, Math.min(8, renderer.capabilities.getMaxAnisotropy())).then(textures => {
-        if (disposed) { textures.dispose(); return; }
-        studio?.setTextures(textures);
-        requestRender();
-        assetLoaded();
-      });
-      renderer.shadowMap.needsUpdate = true;
-
-      startTarget.set(centre.x, box.min.y + size.y * 0.42 - FRAMING_LIFT, centre.z);
-      for (const x of [box.min.x, box.max.x]) {
-        for (const y of [box.min.y, box.max.y]) {
-          for (const z of [box.min.z, box.max.z]) corners.push(new Vector3(x, y, z));
+  /**
+   * Loads a vehicle and swaps it in. The vehicle on show stays until the new one has loaded. A
+   * result that arrives after a later request, or after the viewer closed, is released unused.
+   */
+  const loadVehicle = (target: VehicleModel, first: boolean) => {
+    const token = ++loadToken;
+    // later loads wait for the vehicle and its garage textures only
+    if (!first) pending = 2;
+    loader.load(
+      withBust(modelUrl(target), cacheBust),
+      (gltf) => {
+        if (disposed || token !== loadToken) {
+          disposeObject(gltf.scene);
+          return;
         }
-      }
-      resetView(true);
-
-      requestRender();
-      assetLoaded();
-    },
-    (event) => {
-      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
-    },
-    (error) => {
-      if (!disposed) onError?.(error);
-    },
-  );
+        unloadVehicle();
+        buildVehicle(target, gltf.scene, token);
+        assetLoaded();
+      },
+      (event) => {
+        if (token === loadToken && event.lengthComputable) onProgress?.(event.loaded / event.total);
+      },
+      (error) => {
+        if (!disposed && token === loadToken) onError?.(error);
+      },
+    );
+  };
+  loadVehicle(initialModel, true);
 
   return {
     resetView: () => { setPresenting(false); resetView(); },
@@ -432,28 +471,35 @@ export function createViewer(
       reflections.set(enabled, performance.now(), reducedMotion());
       requestRender();
     },
+    setModel(next) {
+      if (disposed || next === spec) return;
+      spec = next;
+      loadVehicle(next, false);
+    },
     setBedLiner(enabled) {
       bedLiner = enabled;
-      vehicleMaterials?.setBedLiner(enabled, reducedMotion());
+      vehicle?.materials.setBedLiner(enabled, reducedMotion());
       requestRender();
     },
+    // Door and accessory names belong to one model, so while another model is loading they are
+    // only remembered and applied when it is built.
     setDoors(state) {
       doorState = state;
-      animatedDoors?.set(state, performance.now(), reducedMotion());
+      if (vehicle?.spec === spec) vehicle.doors?.set(state, performance.now(), reducedMotion());
       renderer.shadowMap.needsUpdate = true;
       requestRender();
     },
     setHiddenNodes(names) {
       if (names.length === hiddenNodes.length && names.every((name, i) => name === hiddenNodes[i])) return;
       hiddenNodes = names;
-      animatedAccessories?.setHidden(names, performance.now(), reducedMotion());
+      if (vehicle?.spec === spec) vehicle.accessories.setHidden(names, performance.now(), reducedMotion());
       renderer.shadowMap.needsUpdate = true;
       requestRender();
     },
     setPaintColour(colour) {
       if (colour === paintColour) return;
       paintColour = colour;
-      vehicleMaterials?.setPaintColour(colour, reducedMotion());
+      vehicle?.materials.setPaintColour(colour, reducedMotion());
       requestRender();
     },
     dispose() {
@@ -462,13 +508,10 @@ export function createViewer(
       observer.disconnect();
       canvas.removeEventListener("webglcontextlost", handleContextLost);
       canvas.removeEventListener("webglcontextrestored", handleContextRestored);
-      if (model) disposeObject(model);
-      animatedDoors?.dispose();
-      animatedAccessories?.dispose();
+      unloadVehicle();
       controls.dispose();
       lighting.dispose();
       for (const item of disposables) item.dispose();
-      vehicleMaterials?.dispose();
       environment?.dispose();
       pmrem.dispose();
       renderer.dispose();

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ACCESSORIES } from "../config/accessories.ts";
 import { DEFAULT_COLOUR_ID, PAINT_COLOURS } from "../config/colours.ts";
+import { DEFAULT_MODEL } from "../config/models.ts";
 import { configurationReducer, hiddenNodes, initialConfiguration } from "./configuration.ts";
 
 test("the initial configuration follows the config defaults", () => {
@@ -45,16 +46,26 @@ test("setting an accessory to its current value or an unknown id returns the sam
 });
 
 test("hidden nodes cover the whole group of every hidden accessory and nothing else", () => {
+  const nodesOf = (a: (typeof ACCESSORIES)[number]) => DEFAULT_MODEL.accessories[a.id];
   let state = initialConfiguration();
-  assert.deepEqual(hiddenNodes(state), ACCESSORIES.filter((a) => a.behaviour !== "material" && !a.defaultVisible).flatMap((a) => a.nodes));
+  assert.deepEqual(hiddenNodes(state, DEFAULT_MODEL), ACCESSORIES.filter((a) => a.behaviour !== "material" && !a.defaultVisible).flatMap(nodesOf));
   for (const accessory of ACCESSORIES) {
     state = configurationReducer(state, { type: "setAccessory", accessoryId: accessory.id, visible: false });
   }
-  assert.deepEqual(hiddenNodes(state), ACCESSORIES.filter((a) => a.behaviour !== "material").flatMap((a) => a.nodes));
+  assert.deepEqual(hiddenNodes(state, DEFAULT_MODEL), ACCESSORIES.filter((a) => a.behaviour !== "material").flatMap(nodesOf));
   for (const accessory of ACCESSORIES) {
     state = configurationReducer(state, { type: "setAccessory", accessoryId: accessory.id, visible: true });
   }
-  assert.deepEqual(hiddenNodes(state), []);
+  assert.deepEqual(hiddenNodes(state, DEFAULT_MODEL), []);
+});
+
+test("a model hides nodes only for the accessories it offers", () => {
+  const partial = { ...DEFAULT_MODEL, accessories: { "mud-flaps": ["flap_a", "flap_b"] } };
+  let state = initialConfiguration();
+  state = configurationReducer(state, { type: "setAccessory", accessoryId: "roof-rails", visible: false });
+  assert.deepEqual(hiddenNodes(state, partial), []);
+  state = configurationReducer(state, { type: "setAccessory", accessoryId: "mud-flaps", visible: false });
+  assert.deepEqual(hiddenNodes(state, partial), ["flap_a", "flap_b"]);
 });
 
 test("removing the bed liner keeps the tray geometry visible through colour and accessory changes", () => {
@@ -62,5 +73,5 @@ test("removing the bed liner keeps the tray geometry visible through colour and 
   state = configurationReducer(state, { type: "selectColour", colourId: "mineral-white" });
   state = configurationReducer(state, { type: "setAccessory", accessoryId: "roof-rails", visible: false });
   assert.equal(state.accessories["bed-liner"], false);
-  assert.deepEqual(hiddenNodes(state), ["rail_01"]);
+  assert.deepEqual(hiddenNodes(state, DEFAULT_MODEL), ["rail_01"]);
 });

@@ -4,9 +4,9 @@ import { Icon } from "@/components/Icon";
 import { Toggle } from "@/components/Toggle";
 import { CameraControls } from "@/components/CameraControls";
 import { useFullscreen } from "@/components/useFullscreen";
-import { ACCESSORIES } from "@/config/accessories";
-import { PAINT_COLOURS, getPaintColour } from "@/config/colours";
+import { getPaintColour } from "@/config/colours";
 import { closedDoors, DOORS, DOOR_IDS, type DoorState } from "@/config/doors";
+import { DEFAULT_MODEL, VEHICLE_MODELS, colourForModel, getModel, modelAccessories, modelColours } from "@/config/models";
 import { configurationReducer, hiddenNodes, initialConfiguration } from "@/state/configuration";
 import { useViewer } from "@/viewer/useViewer";
 import { VIEWS, type ViewId } from "@/config/views";
@@ -50,9 +50,16 @@ export function App() {
   const lastSelector = useRef<HTMLButtonElement | null>(null);
   const appRef = useRef<HTMLElement | null>(null);
   const fullscreen = useFullscreen(appRef);
-  const colour = getPaintColour(configuration.colourId);
-  const hidden = useMemo(() => hiddenNodes(configuration), [configuration.accessories]);
+  const [modelId, setModelId] = useState(DEFAULT_MODEL.id);
+  const model = getModel(modelId);
+  // the selection is kept for a model that offers the colour, otherwise the model's default shows
+  const colourId = colourForModel(model, configuration.colourId);
+  const colour = getPaintColour(colourId);
+  const offered = modelAccessories(model);
+  const fitted = offered.filter(accessory => accessory.behaviour !== "material");
+  const hidden = useMemo(() => hiddenNodes(configuration, model), [configuration.accessories, model]);
   const viewer = useViewer({
+    model,
     paintColour: colour.hex,
     bedLiner: configuration.accessories["bed-liner"],
     hiddenNodes: hidden,
@@ -60,7 +67,25 @@ export function App() {
     reflections,
   });
   const ready = viewer.status === "ready";
-  const activePanel = PANELS.find(item => item.id === panel);
+  // the panels and views follow what the model supports
+  const panels = PANELS.filter(item => {
+    if (item.id === "accessories") return fitted.length > 0;
+    if (item.id === "trim") return offered.some(accessory => accessory.id === "bed-liner");
+    if (item.id === "interior") return model.doors;
+    return true;
+  });
+  const views = VIEWS.filter(view => view.id !== "driver" || model.camera.driverEye);
+  const activePanel = panels.find(item => item.id === panel);
+
+  const selectModel = (id: string) => {
+    if (id === modelId) return;
+    const next = getModel(id);
+    setModelId(id);
+    setPanel(null);
+    setViewListOpen(false);
+    setSelectedView("front");
+    if (!next.doors) setDoors(closedDoors());
+  };
 
   useEffect(() => {
     if (viewListOpen) viewChoice.current?.focus();
@@ -89,7 +114,16 @@ export function App() {
   return (
     <main className="app" ref={appRef}>
       <div className="viewer" ref={viewer.containerRef} />
-      <h1 className="vehicle-name">ISUZU D-MAX</h1>
+      <h1 className="vehicle-name">{model.label.toUpperCase()}</h1>
+      {VEHICLE_MODELS.length > 1 && (
+        <div className="model-picker surface" role="group" aria-label="Vehicle">
+          {VEHICLE_MODELS.map(item => (
+            <button key={item.id} type="button" aria-pressed={item.id === modelId} onClick={() => selectModel(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
       {ready && <CameraControls />}
 
       {viewer.status === "loading" && (
@@ -123,18 +157,18 @@ export function App() {
 
           {panel === "paint" && (
             <div className="swatches">
-              {PAINT_COLOURS.map(option => (
+              {modelColours(model).map(option => (
                 <button
                   key={option.id}
                   type="button"
                   className="swatch"
                   aria-label={option.name}
-                  aria-pressed={option.id === configuration.colourId}
+                  aria-pressed={option.id === colourId}
                   data-tooltip={option.name}
                   onClick={() => dispatch({ type: "selectColour", colourId: option.id })}
                 >
                   <span className="swatch-colour" style={{ backgroundColor: option.hex }}>
-                    {option.id === configuration.colourId && (
+                    {option.id === colourId && (
                       <Check size={16} className="swatch-check" aria-hidden="true" />
                     )}
                   </span>
@@ -145,7 +179,7 @@ export function App() {
 
           {panel === "accessories" && (
             <div className="toggle-grid">
-              {ACCESSORIES.filter(accessory => accessory.behaviour !== "material").map(accessory => (
+              {fitted.map(accessory => (
                 <Toggle
                   key={accessory.id}
                   label={accessory.label}
@@ -214,7 +248,7 @@ export function App() {
             aria-pressed={viewer.presenting} onClick={() => { setPanel(null); setViewListOpen(false); viewer.setPresenting(!viewer.presenting); }}><Icon svg={playIcon} /></button>
         </div>
         <div className="toolbar-selectors toolbar-group" role="group" aria-label="Configuration">
-        {PANELS.map(item => (
+        {panels.map(item => (
           <button
             key={item.id}
             type="button"
@@ -269,7 +303,7 @@ export function App() {
           disabled={!ready} onClick={viewer.resetView}><RotateCcw size={20} strokeWidth={1.4} aria-hidden="true" /></button>
         </div>
         {viewListOpen && <div id="camera-views" className="view-list surface" role="group" aria-label="Camera views">
-          {VIEWS.map(view => <button key={view.id} ref={view.id === selectedView ? viewChoice : undefined} type="button"
+          {views.map(view => <button key={view.id} ref={view.id === selectedView ? viewChoice : undefined} type="button"
             aria-pressed={view.id === selectedView} onClick={() => {
               setSelectedView(view.id); viewer.setView(view.id); setViewListOpen(false); viewListButton.current?.focus();
             }}>

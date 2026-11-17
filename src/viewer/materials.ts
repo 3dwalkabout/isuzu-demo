@@ -11,8 +11,14 @@ import { Transition } from "./motion.ts";
 export type GlassMode = "alpha" | "transmission";
 export const GLASS_MODE: GlassMode = "alpha";
 
+/** Which model materials carry the paint and the accent colour, and which nodes hold the bed liner, comes from the model's config. */
+export interface VehicleMaterialNames {
+  paint: string;
+  accent: string | null;
+  linerNodes: readonly string[];
+}
+
 const PAINT = {
-  material: "carpaint",
   metalness: 0.55,
   roughness: 0.32,
   clearcoat: 1,
@@ -21,7 +27,6 @@ const PAINT = {
 } as const;
 
 const ACCENT = {
-  material: "carpaint_second",
   colour: "#25282c",
   metalness: 0.85,
   roughness: 0.35,
@@ -50,10 +55,12 @@ const GLASS_REFLECTION: Record<string, number> = {
 /** Window glass is tinted dark so the bright interior does not show through, and kept slightly rough so the studio does not mirror on it. */
 const WINDOW_TINT = { material: "windowglass", colour: "#1b2225", roughness: 0.25 } as const;
 
-/** Model material names this file relies on, a test checks that each exists in the shipped model. */
+/**
+ * Model material names this file tunes by name, a test checks that each exists in the default
+ * model. A model without one of them is left as exported for that part. Paint and accent names
+ * are per model, in `models.ts`.
+ */
 export const TUNED_MATERIAL_NAMES: readonly string[] = [
-  PAINT.material,
-  ACCENT.material,
   TYRE.material,
   TRIM.material,
   ...Object.keys(GLASS_OPACITY),
@@ -91,9 +98,9 @@ function toAlphaGlass(material: Material, opacity: number) {
  * shared material, so a colour change is a single assignment and leaves clearcoat,
  * roughness and everything else untouched.
  */
-export function applyVehicleMaterials(root: Object3D, paintColour: string, bedLiner = true): VehicleMaterials {
+export function applyVehicleMaterials(root: Object3D, paintColour: string, bedLiner: boolean, names: VehicleMaterialNames): VehicleMaterials {
   const paint = new MeshPhysicalMaterial({
-    name: PAINT.material,
+    name: names.paint,
     side: DoubleSide,
     color: new Color(paintColour),
     metalness: PAINT.metalness,
@@ -102,12 +109,14 @@ export function applyVehicleMaterials(root: Object3D, paintColour: string, bedLi
     clearcoatRoughness: PAINT.clearcoatRoughness,
     envMapIntensity: PAINT.envMapIntensity,
   });
-  const accent = new MeshPhysicalMaterial({
-    name: ACCENT.material,
-    color: new Color(ACCENT.colour),
-    metalness: ACCENT.metalness,
-    roughness: ACCENT.roughness,
-  });
+  const accent = names.accent
+    ? new MeshPhysicalMaterial({
+        name: names.accent,
+        color: new Color(ACCENT.colour),
+        metalness: ACCENT.metalness,
+        roughness: ACCENT.roughness,
+      })
+    : null;
   const replaced = new Set<Material>();
   const paintFrom = paint.color.clone();
   const paintTo = paint.color.clone();
@@ -118,10 +127,10 @@ export function applyVehicleMaterials(root: Object3D, paintColour: string, bedLi
   const rubberColour = new Color("#101214");
 
   eachMesh(root, (mesh, material) => {
-    if (material.name === PAINT.material) {
+    if (material.name === names.paint) {
       replaced.add(material);
       mesh.material = paint;
-    } else if (material.name === ACCENT.material) {
+    } else if (accent && material.name === names.accent) {
       replaced.add(material);
       mesh.material = accent;
     } else if (material.name === TYRE.material) {
@@ -140,9 +149,11 @@ export function applyVehicleMaterials(root: Object3D, paintColour: string, bedLi
   });
 
   for (const material of replaced) material.dispose();
-  root.getObjectByName("trunk")?.traverse(object => {
-    if ((object as Mesh).isMesh) (object as Mesh).material = liner;
-  });
+  for (const name of names.linerNodes) {
+    root.getObjectByName(name)?.traverse(object => {
+      if ((object as Mesh).isMesh) (object as Mesh).material = liner;
+    });
+  }
 
   const update = (now: number) => {
     const active = paintMotion.update(now);
@@ -169,7 +180,7 @@ export function applyVehicleMaterials(root: Object3D, paintColour: string, bedLi
     update,
     dispose: () => {
       paint.dispose();
-      accent.dispose();
+      accent?.dispose();
       liner.dispose();
     },
   };

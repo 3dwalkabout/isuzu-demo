@@ -1,5 +1,6 @@
 import { ACCESSORIES } from "../config/accessories.ts";
 import { DEFAULT_COLOUR_ID, PAINT_COLOURS } from "../config/colours.ts";
+import { modelAccessories, type VehicleModel } from "../config/models.ts";
 
 export interface Configuration {
   colourId: string;
@@ -32,7 +33,9 @@ export function configurationReducer(state: Configuration, action: Configuration
   }
 }
 
-/** Names of every model node that must be hidden for this configuration. */
-export function hiddenNodes(configuration: Configuration): string[] {
-  return ACCESSORIES.filter((a) => a.behaviour !== "material" && !configuration.accessories[a.id]).flatMap((a) => a.nodes);
+/** Names of every node of the model that must be hidden for this configuration. */
+export function hiddenNodes(configuration: Configuration, model: VehicleModel): string[] {
+  return modelAccessories(model)
+    .filter((a) => a.behaviour !== "material" && !configuration.accessories[a.id])
+    .flatMap((a) => model.accessories[a.id]);
 }
