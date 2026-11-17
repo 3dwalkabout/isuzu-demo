@@ -92,6 +92,8 @@ interface Vehicle {
   doors: ReturnType<typeof createDoors> | null;
   accessories: ReturnType<typeof createAccessoryMotion>;
   studio: ReturnType<typeof createStudio>;
+  /** Set once the garage textures have been applied, the vehicle counts as loaded after that. */
+  texturesReady: boolean;
 }
 
 export function createViewer(
@@ -228,11 +230,14 @@ export function createViewer(
   resize();
 
   let disposed = false;
-  // the first load waits for the environment map, the vehicle and the garage textures
-  let pending = 3;
-  const assetLoaded = () => {
-    pending -= 1;
-    if (pending === 0 && !disposed) onLoaded?.();
+  // loaded means the environment map, the requested vehicle and its garage textures are all in
+  // place, announced once per request
+  let announced = 0;
+  const checkLoaded = () => {
+    if (disposed || announced === loadToken) return;
+    if (!environment || !vehicle || vehicle.spec !== spec || !vehicle.texturesReady) return;
+    announced = loadToken;
+    onLoaded?.();
   };
   let environment: Texture | null = null;
   const disposables: { dispose: () => void }[] = [];
@@ -358,7 +363,7 @@ export function createViewer(
       vehicle?.studio.setEnvironment(environment);
       disposables.push(target);
       requestRender();
-      assetLoaded();
+      checkLoaded();
     },
     undefined,
     (error) => {
@@ -380,7 +385,7 @@ export function createViewer(
     corners.length = 0;
   };
 
-  const buildVehicle = (target: VehicleModel, model: Object3D, token: number) => {
+  const buildVehicle = (target: VehicleModel, model: Object3D) => {
     const materials = applyVehicleMaterials(model, paintColour, bedLiner, {
       paint: target.materials.paint,
       accent: target.materials.accent,
@@ -406,13 +411,15 @@ export function createViewer(
     const studio = createStudio(scene, box.min.y);
     if (environment) studio.setEnvironment(environment);
     reflections.attach(scene);
-    vehicle = { spec: target, model, materials, doors, accessories, studio };
+    const built: Vehicle = { spec: target, model, materials, doors, accessories, studio, texturesReady: false };
+    vehicle = built;
     void loadStudioTextures(import.meta.env.BASE_URL, Math.min(8, renderer.capabilities.getMaxAnisotropy())).then(textures => {
       // the vehicle was swapped out or the viewer closed while the textures were loading
-      if (disposed || vehicle?.studio !== studio) { textures.dispose(); return; }
+      if (disposed || vehicle !== built) { textures.dispose(); return; }
       studio.setTextures(textures);
+      built.texturesReady = true;
       requestRender();
-      if (token === loadToken) assetLoaded();
+      checkLoaded();
     });
     renderer.shadowMap.needsUpdate = true;
 
@@ -432,10 +439,8 @@ export function createViewer(
    * Loads a vehicle and swaps it in. The vehicle on show stays until the new one has loaded. A
    * result that arrives after a later request, or after the viewer closed, is released unused.
    */
-  const loadVehicle = (target: VehicleModel, first: boolean) => {
+  const loadVehicle = (target: VehicleModel) => {
     const token = ++loadToken;
-    // later loads wait for the vehicle and its garage textures only
-    if (!first) pending = 2;
     loader.load(
       withBust(modelUrl(target), cacheBust),
       (gltf) => {
@@ -444,8 +449,7 @@ export function createViewer(
           return;
         }
         unloadVehicle();
-        buildVehicle(target, gltf.scene, token);
-        assetLoaded();
+        buildVehicle(target, gltf.scene);
       },
       (event) => {
         if (token === loadToken && event.lengthComputable) onProgress?.(event.loaded / event.total);
@@ -455,7 +459,7 @@ export function createViewer(
       },
     );
   };
-  loadVehicle(initialModel, true);
+  loadVehicle(initialModel);
 
   return {
     resetView: () => { setPresenting(false); resetView(); },
@@ -474,7 +478,13 @@ export function createViewer(
     setModel(next) {
       if (disposed || next === spec) return;
       spec = next;
-      loadVehicle(next, false);
+      if (vehicle?.spec === next) {
+        // switching back to the vehicle on show while another one was loading, drop that load
+        loadToken += 1;
+        checkLoaded();
+        return;
+      }
+      loadVehicle(next);
     },
     setBedLiner(enabled) {
       bedLiner = enabled;

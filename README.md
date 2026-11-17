@@ -34,7 +34,8 @@ Open `https://your-domain/car-configurator/` and check the vehicle, colours, acc
 Colours and accessories are data, edit them without touching other code:
 
 - `src/config/colours.ts` lists the body colours (`id`, `name`, `hex`) and the default. Names match the Australian D-MAX X-TERRAIN customiser checked on 9 November 2026; hex values remain display approximations. Colours change only the shared `carpaint` material; finish and clearcoat come from `src/viewer/materials.ts`.
-- `src/config/accessories.ts` lists each accessory (`id`, `label`, `nodes`, `defaultVisible`). `nodes` are model node names, all shown or hidden together. After `gltfpack` a name can match a wrapper group and its mesh, both are toggled
+- `src/config/accessories.ts` lists each accessory (`id`, `label`, `defaultVisible`). The model nodes behind an accessory are listed per model in `src/config/models.ts`, all shown or hidden together. After `gltfpack` a name can match a wrapper group and its mesh, both are toggled
+- `src/config/models.ts` lists the vehicles the viewer can show. Each entry has the `id`, `label`, optimised `.glb` under `public/models/`, the paint and accent material names, the accessory-to-node mapping, whether doors are supported, an optional colour subset and the camera framing and limits. A model offers only the accessories listed for it, and the model picker appears once more than one model is listed. To add a vehicle, run `scripts/optimise-model.mjs` with `--out public/models/<name>.glb`, add an entry, and the config test resolves every name against that file
 - `src/viewer/materials.ts` holds the tuned materials by name: `carpaint` (body), `carpaint_second` (grille accents), `tire` and the glass materials
 
 | Accessory | Model node |
