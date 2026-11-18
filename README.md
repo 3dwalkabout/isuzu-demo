@@ -25,9 +25,13 @@ npm ci
 npm run build -- --base=./
 ```
 
-In cPanel File Manager, open the target domain's document root (often `public_html`) and create a dedicated folder for the demo, such as `car-configurator`. Upload the contents of `dist/` directly into that folder: `index.html`, `assets/`, `models/`, `hdri/` and `textures/`. Preserve the folder structure. Do not upload the source project or `node_modules`.
+In cPanel File Manager, open the target domain's document root (often `public_html`) and create a dedicated folder for the demo, such as `car-configurator`. Upload the contents of `dist/` directly into that folder: `index.html`, `assets/`, `models/`, `hdri/`, `textures/` and, once a track is added, `audio/`. Preserve the folder structure. Do not upload the source project or `node_modules`.
 
 Open `https://your-domain/car-configurator/` and check the vehicle, colours, accessories and doors. The page title and description are defined in the source `index.html`; rebuild and upload after changing them. HTTPS and ordinary static-file hosting are sufficient; no Node server is needed in cPanel.
+
+**Compression.** The `.glb` model files, `.hdr` environment map and the main `.js` bundle are large. Enable gzip or Brotli on the server for `.glb`, `.hdr`, `.js` and `.css` to roughly halve transfer size (9.9 MB gzip vs 15.4 MB raw for the full build). In cPanel this is usually on by default for text files; check that `.glb` and `.hdr` are included. Without compression, load time at 5 Mbit/s is around 30 s; with gzip it drops to around 20 s.
+
+**Audio caching.** Once a background track is added under `public/audio/`, set a long `Cache-Control` header on that folder (for example `max-age=31536000, immutable`) so returning visitors do not re-download it. Rename the file when the track changes so the new URL bypasses the cache.
 
 ## Configuration
 
